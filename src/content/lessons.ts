@@ -1215,119 +1215,202 @@ for rho in [0.5, 0.2, 0.05]:
     slug: "hyperparameters",
     module: "09",
     section: "Advanced Concepts",
-    title: "Random Forest Hyperparameters",
+    title: "Random Forest Hyperparameters: Exhaustive 18-Parameter Reference",
     intro:
-      "Random Forest hyperparameters govern the structural growth of individual trees, the introduction of randomness, parallelization, and ensemble aggregation, directly controlling the bias-variance balance.",
+      "A complete, mathematically rigorous reference for all 18 hyperparameters of Scikit-Learn's RandomForestClassifier. Understand the internal mechanics, algorithmic effects, memory consumption, CPU scaling, and production presets governing tree ensembles.",
     whyNecessary:
-      "While Random Forest has remarkably sensible default settings in Scikit-Learn, unoptimized parameters on complex or imbalanced datasets can lead to unnecessary memory consumption, excessive inference latency, or sub-optimal accuracy.",
+      "While Scikit-Learn provides sensible defaults, unoptimized Random Forest parameters on high-dimensional, imbalanced, or latency-constrained datasets frequently cause runaway memory usage, slow inference, and suboptimal generalization. Mastering all 18 hyperparameters allows engineers to systematically navigate the bias-variance trade-off, optimize CPU cache efficiency, and deploy rock-solid production pipelines.",
     intuition:
-      "Think of the knobs on an audio equalizer. You can adjust the treble (tree depth) and bass (number of trees) to tune out background noise while maximizing the clarity of the musical signal.",
+      "Think of a Random Forest as an orchestra of decision trees. Tuning hyperparameters is like adjusting the acoustics, instrument diversity, conductor tempo, and seating arrangement: you balance individual instrument volume (tree depth & leaf support) against ensemble harmony (feature randomization & sample bagging) to eliminate acoustic distortion (variance) without muffling the melody (bias).",
     theory: [
-      "n_estimators (default=100): The number of trees in the forest. Increasing n_estimators always reduces or stabilizes variance without increasing bias, bounded only by computational resources.",
-      "max_features (default='sqrt' for clf, 1.0 for reg): The number of candidate features evaluated at each split. Smaller values decorrelate trees (reducing variance) at the cost of slightly increasing individual tree bias.",
-      "max_depth (default=None): Maximum tree depth. If None, nodes expand until all leaves are pure or contain fewer than min_samples_split.",
-      "min_samples_split (default=2): Minimum number of samples required to split an internal node. Higher values enforce pre-pruning.",
-      "min_samples_leaf (default=1): Minimum number of samples required to be at a leaf node. Setting this to 5-10 smooths regression models and reduces sensitivity to outliers.",
-      "bootstrap (default=True): Whether bootstrap samples are used. If False, the whole dataset is used to build each tree.",
-      "oob_score (default=False): Whether to use out-of-bag samples to estimate generalization score.",
-      "n_jobs (default=None): Number of jobs to run in parallel. Setting to -1 uses all CPU cores.",
+      "Scikit-Learn's RandomForestClassifier exposes 18 hyperparameters organized into four functional pillars: (1) Tree Structural Regularization, (2) Randomization & Decorrelation, (3) Compute, Hardware & Parallelism, and (4) Algorithmic Constraints & Loss Adaptation.",
+      "Tree Structural Regularization (criterion, max_depth, min_samples_split, min_samples_leaf, max_leaf_nodes, min_impurity_decrease, ccp_alpha): These parameters govern individual tree capacity. By default, Scikit-Learn expands trees until all leaves are pure (max_depth=None, min_samples_split=2, min_samples_leaf=1). This yields zero-bias, high-variance individual estimators. Pre-pruning via max_depth or min_samples_leaf caps depth and smooths leaf predictions, while post-pruning via ccp_alpha eliminates weakly predictive subtrees.",
+      "Randomization & Resampling (n_estimators, max_features, bootstrap, max_samples, random_state): Random Forest derives its generalization power from Breiman's dual forces: individual tree strength s and inter-tree correlation ρ̄. The error bound PE* ≤ ρ̄ (1 - s²) / s² proves that lowering tree correlation drives down ensemble variance. By subsampling features at each split (max_features='sqrt') and drawing bootstrap samples with replacement (bootstrap=True, max_samples=None), each tree observes a distinct perspective of the feature space.",
+      "Compute, Hardware & Execution (n_jobs, warm_start, verbose, oob_score): Tree fitting in Random Forest is an embarrassingly parallel operation. Through joblib's loky multiprocessing backend, Scikit-Learn bypasses Python's Global Interpreter Lock (GIL) and distributes tree construction across physical and logical CPU cores. oob_score calculates an unbiased out-of-bag generalization estimate for free during training without requiring K-fold cross-validation.",
+      "Algorithmic Constraints & Loss Adaptation (class_weight, monotonic_cst): class_weight adjusts split impurity criteria inversely proportional to class frequencies, preventing majority class domination in skewed datasets. monotonic_cst enforces monotonic directional constraints (+1 for non-decreasing, -1 for non-increasing), ensuring compliant, interpretable behavior in regulated domains such as healthcare and credit scoring.",
     ],
-    readTime: "16 min",
-    difficulty: "Intermediate",
+    readTime: "22 min",
+    difficulty: "Advanced",
     formulas: [
       {
-        label: "max_features (Classification Default)",
+        label: "Feature Subspace Dimension (Classification Default)",
         expr: "m = \\lfloor \\sqrt{p} \\rfloor",
-        note: "Default in Scikit-Learn for RandomForestClassifier.",
+        note: "Default candidate feature count evaluated at each split in RandomForestClassifier.",
       },
       {
-        label: "max_features (Regression Default)",
-        expr: "m = p \\quad (\\text{or } \\lfloor p/3 \\rfloor \\text{ recommendation})",
-        note: "Scikit-Learn uses 1.0 (all features), while Breiman originally recommended p/3.",
+        label: "Impurity Decrease Criterion",
+        expr: "\\Delta I(s, t) = \\frac{N_t}{N} \\left[ I(t) - \\frac{N_{t_L}}{N_t} I(t_L) - \\frac{N_{t_R}}{N_t} I(t_R) \\right]",
+        note: "Node t is split only if \\Delta I(s, t) \\ge \\text{min\\_impurity\\_decrease}.",
+      },
+      {
+        label: "Minimal Cost-Complexity Pruning Objective",
+        expr: "R_\\alpha(T) = R(T) + \\alpha |T|",
+        note: "ccp_alpha penalizes tree complexity |T|; subtrees with \\alpha_{\\text{eff}} < \\alpha are pruned.",
+      },
+      {
+        label: "Breiman's Asymptotic Generalization Bound",
+        expr: "PE^* \\le \\bar{\\rho} \\left( \\frac{1 - s^2}{s^2} \\right)",
+        note: "Ensemble error bound where \\bar{\\rho} is mean tree correlation and s is individual tree strength.",
       },
       {
         label: "Balanced Class Weight Calculation",
         expr: "w_c = \\frac{N}{K \\times N_c}",
-        note: "Weight assigned to class c with N_c samples across K total classes.",
+        note: "Weight applied to class c with N_c samples across K total classes.",
       },
     ],
-    workedExample: {
-      title: "Calculating Balanced Class Weights for Imbalanced Training",
-      problem:
-        "A binary medical dataset has N = 1000 total patients with K = 2 classes: 950 healthy (Class 0) and 50 diseased (Class 1). Calculate the weights assigned when class_weight='balanced'.",
+    derivation: {
+      title: "Split Impurity Gain and Cost-Complexity Pruning Threshold",
+      description:
+        "Mathematical derivation of how Scikit-Learn evaluates split feasibility via min_impurity_decrease and prunes redundant subtrees with ccp_alpha.",
       steps: [
         {
-          title: "Compute weight for Healthy Class 0 (N_0 = 950)",
-          calculation: "w_0 = \\frac{1000}{2 \\times 950} = \\frac{1000}{1900} \\approx 0.5263",
-          explanation: "Majority class weight is scaled down to ~0.53.",
+          step: "Node Impurity Formulation",
+          math: "I_G(t) = 1 - \\sum_{k=1}^K p_{t,k}^2, \\quad H(t) = -\\sum_{k=1}^K p_{t,k} \\log_2 p_{t,k}",
+          note: "Scikit-Learn computes parent impurity using either Gini index or Shannon entropy over class proportions p_{t,k}.",
         },
         {
-          title: "Compute weight for Diseased Class 1 (N_1 = 50)",
-          calculation: "w_1 = \\frac{1000}{2 \\times 50} = \\frac{1000}{100} = 10.0",
-          explanation: "Minority class weight is amplified by a factor of 10.0.",
+          step: "Split Partitioning and Weighted Child Impurity",
+          math: "I(s, t) = \\frac{N_{t_L}}{N_t} I(t_L) + \\frac{N_{t_R}}{N_t} I(t_R)",
+          note: "Candidate split s on feature j with threshold θ partitions N_t samples into left and right subsets.",
         },
         {
-          title: "Verify weighted balance",
-          calculation: "950 \\times 0.5263 = 500, \\quad 50 \\times 10.0 = 500",
-          explanation: "Both classes now exert equal total influence (500 units each) on Gini split impurity!",
+          step: "Global Scaled Impurity Decrease Verification",
+          math: "\\Delta I(s, t) = \\frac{N_t}{N_{\\text{total}}} \\left[ I(t) - I(s, t) \\right] \\ge \\text{min\\_impurity\\_decrease}",
+          note: "A split is accepted if and only if its global weighted impurity reduction satisfies the min_impurity_decrease threshold.",
+        },
+        {
+          step: "Cost-Complexity Pruning Objective Function",
+          math: "R_\\alpha(T) = \\sum_{t \\in \\widetilde{T}} R(t) + \\alpha |\\widetilde{T}|",
+          note: "Here R(t) is total misclassification cost at leaf t, and |\\widetilde{T}| is the number of terminal leaves.",
+        },
+        {
+          step: "Effective Alpha for Subtree Collapse",
+          math: "\\alpha_{\\text{eff}}(t) = \\frac{R(t) - R(T_t)}{|\\widetilde{T}_t| - 1}",
+          note: "When ccp_alpha ≥ α_eff(t), subtree T_t is collapsed into a single terminal leaf t.",
         },
       ],
-      result: "Class 0 weight = 0.526, Class 1 weight = 10.0 (perfect empirical balance).",
+    },
+    workedExample: {
+      title: "Evaluating Split Feasibility with min_impurity_decrease and Balanced Weights",
+      problem:
+        "At internal node t with N_t = 100 samples (60 Class 0, 40 Class 1) out of N_total = 1000 total dataset samples, a candidate split yields Left: 50 samples (45 Class 0, 5 Class 1) and Right: 50 samples (15 Class 0, 35 Class 1). If min_impurity_decrease = 0.025, determine whether the split is accepted or rejected.",
+      steps: [
+        {
+          title: "Compute Parent Node Gini Impurity I(t)",
+          calculation: "I(t) = 1 - (0.60^2 + 0.40^2) = 1 - (0.36 + 0.16) = 0.4800",
+          explanation: "Parent node has 60% Class 0 and 40% Class 1, resulting in Gini impurity of 0.48.",
+        },
+        {
+          title: "Compute Left Child Gini Impurity I(t_L)",
+          calculation: "I(t_L) = 1 - (0.90^2 + 0.10^2) = 1 - (0.81 + 0.01) = 0.1800",
+          explanation: "Left subset has 45 Class 0 and 5 Class 1 (90% pure).",
+        },
+        {
+          title: "Compute Right Child Gini Impurity I(t_R)",
+          calculation: "I(t_R) = 1 - (0.30^2 + 0.70^2) = 1 - (0.09 + 0.49) = 0.4200",
+          explanation: "Right subset has 15 Class 0 and 35 Class 1 (70% pure).",
+        },
+        {
+          title: "Compute Local Impurity Reduction",
+          calculation: "\\Delta I_{\\text{local}} = 0.48 - \\left( \\frac{50}{100}(0.18) + \\frac{50}{100}(0.42) \\right) = 0.48 - 0.30 = 0.1800",
+          explanation: "Local impurity drops by 0.18 within node t.",
+        },
+        {
+          title: "Compute Global Scaled Impurity Decrease Delta I(s, t)",
+          calculation: "\\Delta I(s, t) = \\frac{N_t}{N_{\\text{total}}} \\times \\Delta I_{\\text{local}} = \\frac{100}{1000} \\times 0.18 = 0.0180",
+          explanation: "Scikit-Learn scales the gain by the sample proportion N_t / N_total.",
+        },
+        {
+          title: "Evaluate Against min_impurity_decrease Threshold",
+          calculation: "\\Delta I(s, t) = 0.0180 < 0.0250 \\implies \\text{REJECT SPLIT}",
+          explanation: "Because 0.0180 is strictly less than 0.0250, the split is aborted and node t remains an unsplit leaf.",
+        },
+      ],
+      result: "Split rejected (ΔI = 0.018 < 0.025). Node t is kept as a leaf, protecting the forest from overfitting on small sample subsets.",
     },
     rfConnection:
-      "Tuning these hyperparameters is the direct interface through which machine learning engineers optimize Random Forest models in production environments.",
-    code: `from sklearn.ensemble import RandomForestClassifier
+      "Every Random Forest hyperparameter directly targets either individual tree strength s or inter-tree correlation ρ̄ in Breiman's fundamental theorem: PE* ≤ ρ̄ (1 - s²) / s². Randomization parameters (max_features, bootstrap, max_samples) depress ρ̄, while structural regularizers (max_depth, min_samples_leaf, ccp_alpha) preserve s without allowing individual trees to memorize sample noise.",
+    code: `import numpy as np
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedKFold, HalvingGridSearchCV
+from sklearn.datasets import make_classification
 
-# Production-tuned Random Forest configuration
-rf_tuned = RandomForestClassifier(
-    n_estimators=300,        # Ample trees for asymptotic variance reduction
-    max_depth=15,            # Pre-pruning to curb tree depth and save RAM
-    min_samples_split=6,     # Guards against isolated outlier splits
-    min_samples_leaf=3,      # Ensures each leaf has statistically meaningful sample support
-    max_features='sqrt',     # Optimal decorrelation for classification
-    bootstrap=True,          # Essential for OOB estimation
-    oob_score=True,          # Free cross-validation metric
-    class_weight='balanced', # Compensates for label imbalance
-    n_jobs=-1,               # Maximize multi-core CPU utilization
-    random_state=42
+# Generate realistic high-dimensional tabular benchmark
+X, y = make_classification(
+    n_samples=5000, n_features=25, n_informative=15,
+    n_redundant=5, weights=[0.85, 0.15], random_state=42
 )
-print("Configured Random Forest Model:", rf_tuned)`,
+
+# Production-grade Random Forest with full hyperparameter orchestration
+rf_model = RandomForestClassifier(
+    n_estimators=300,              # Ample trees for variance convergence
+    criterion='gini',              # Fast Gini impurity evaluation
+    max_depth=16,                  # Cap maximum tree depth
+    min_samples_split=8,           # Enforce minimum internal node split threshold
+    min_samples_leaf=4,            # Guard against singleton leaf noise
+    max_features='sqrt',           # m = floor(sqrt(p)) optimal decorrelation
+    max_leaf_nodes=None,           # Unrestricted leaf count under depth cap
+    min_impurity_decrease=1e-4,    # Early split termination threshold
+    bootstrap=True,                # Essential for bagging and OOB
+    max_samples=0.8,               # Subsample 80% to further decorrelate trees
+    oob_score=True,                # Free out-of-bag validation metric
+    n_jobs=-1,                     # Distribute across all CPU cores via loky
+    random_state=42,               # Exact seed for reproducible builds
+    verbose=0,                     # Silent execution for production logs
+    warm_start=False,              # Clean fit from scratch
+    class_weight='balanced_subsample', # Recalculate weights per bootstrap sample
+    ccp_alpha=0.0,                 # Pre-pruning used in lieu of post-pruning
+    monotonic_cst=None             # Unconstrained feature directionality
+)
+
+rf_model.fit(X, y)
+print(f"OOB Generalization Score: {rf_model.oob_score_:.4f}")
+print(f"Ensemble Trees Fitted:    {len(rf_model.estimators_)}")
+print(f"Feature Importances Mean: {rf_model.feature_importances_.mean():.4f}")`,
     codeExplanation:
-      "This configuration balances variance reduction, memory footprint, and class imbalance handling for high-throughput production workloads.",
+      "This production-grade configuration combines variance reduction (n_estimators=300, max_features='sqrt'), subsampling decorrelation (max_samples=0.8), robust leaf constraints (min_samples_leaf=4), and per-bootstrap balance adjustment (class_weight='balanced_subsample').",
     application:
-      "Online ad-click prediction services tune min_samples_leaf and max_depth to keep model checkpoint sizes small enough to fit inside L3 processor cache for microsecond-level scoring.",
+      "Latency-sensitive fraud scoring systems tune max_depth=12 and min_samples_leaf=5 to constrain individual tree leaf counts to under 256. This enables tree nodes to fit inside CPU L2/L3 caches, achieving single-digit microsecond latency at 50,000 requests per second.",
     mistakes: [
-      "Increasing n_estimators hoping to solve an underfitting problem (more trees only reduce variance, not bias).",
-      "Using max_features=1.0 for classification (this disables random feature selection, degenerating Random Forest into standard Bagging).",
-      "Leaving n_jobs=1 on modern 16-core processors (setting n_jobs=-1 speeds up training by 10x-15x).",
+      "Nested Parallelism Anti-Pattern: Running GridSearchCV(n_jobs=-1) concurrently with RandomForestClassifier(n_jobs=-1). On a 16-core machine, this attempts to spawn 256 worker processes, destroying CPU performance via context-switch overhead and RAM starvation.",
+      "Disabling Feature Subspacing: Setting max_features=1.0 for classification problems. This forces every tree to split on the identical dominant features, dramatically increasing inter-tree correlation ρ̄ and destroying the ensemble variance-reduction benefit.",
+      "Increasing n_estimators to Cure High Bias: Adding more trees (e.g., from 300 to 2000) only drives ensemble variance toward its asymptotic floor. It does not reduce the bias of the individual base trees.",
+      "Bootstrap / OOB Incompatibility: Configuring bootstrap=False while setting oob_score=True. Out-of-bag estimation strictly requires unselected bootstrap samples; without replacement, no samples are left out, triggering a Scikit-Learn ValueError.",
+      "Over-relying on max_depth for Regularization: Setting tight max_depth constraints while leaving min_samples_leaf=1. This still permits isolated single-sample leaves on asymmetric branches.",
     ],
     prosCons: {
       pros: [
-        "Defaults work remarkably well on most standard tabular problems.",
-        "n_estimators has no risk of catastrophic overfitting.",
-        "Offers granular controls for latency, memory, and pruning.",
+        "Remarkably robust out-of-the-box defaults that perform strongly without tuning.",
+        "n_estimators exhibits monotonic variance reduction with zero risk of catastrophic overfitting.",
+        "Fine-grained structural dials (min_samples_leaf, max_depth) allow tight inference latency and memory budgeting.",
+        "Embarrassingly parallel fitting across CPU cores with near-linear speedup via loky multiprocessing.",
+        "Built-in out-of-bag validation (oob_score) provides unbiased generalization metrics without cross-validation overhead.",
       ],
       cons: [
-        "Training time scales linearly with n_estimators and depth.",
-        "Tuning max_features and min_samples_leaf requires systematic search.",
+        "Inference memory footprint and serialized pickle size scale directly with n_estimators and tree depth.",
+        "Tuning max_features, min_samples_leaf, and max_depth simultaneously requires systematic search across non-linear interaction surfaces.",
+        "Tree ensembles cannot extrapolate beyond the training bounding box, regardless of hyperparameter configuration.",
       ],
     },
     takeaways: [
-      "n_estimators controls the number of trees; increasing it stabilizes predictions without risk of overfitting.",
-      "max_features controls tree decorrelation; sqrt(p) is optimal for classification.",
-      "class_weight='balanced' automatically rescales split loss by inverse class frequencies.",
+      "All 18 hyperparameters balance Breiman's two fundamental forces: base tree strength s and inter-tree correlation ρ̄.",
+      "Set n_jobs=-1 for standalone fitting, but set inner n_jobs=1 when wrapping the model in an outer parallel search like GridSearchCV(n_jobs=-1).",
+      "For classification, max_features='sqrt' is mathematically optimal; for regression, max_features=1.0 or 'log2' is standard.",
+      "class_weight='balanced_subsample' computes weights independently for each bootstrap sample, making it superior to static 'balanced' when subsampling is active.",
+      "min_samples_leaf is the most effective single regularizer for preventing leaf memorization and stabilizing probability calibration.",
     ],
     quiz: {
-      prompt: "What is the primary effect of decreasing max_features from 1.0 (all features) to sqrt(p)?",
+      prompt:
+        "Why does setting GridSearchCV(n_jobs=-1) alongside RandomForestClassifier(n_jobs=-1) cause severe performance degradation or crash training on a 16-core machine?",
       options: [
-        "It decreases correlation between trees, driving down ensemble variance",
-        "It increases the time required to train each tree",
-        "It guarantees that every tree will be 100% pure",
-        "It forces the model to perform linear regression",
+        "It spawns up to 16 × 16 = 256 concurrent processes, inducing catastrophic CPU thread contention, context switching, and RAM exhaustion (Nested Parallelism Anti-Pattern)",
+        "Scikit-learn automatically converts the Random Forest into a single-threaded decision stump",
+        "The Python GIL completely blocks any process from using more than one core in Scikit-Learn",
+        "Setting n_jobs=-1 is deprecated in scikit-learn and defaults to n_jobs=0 which fails",
       ],
       answerIndex: 0,
       explanation:
-        "Evaluating fewer features at each split prevents all trees from choosing the same dominant feature, decorrelating the trees and reducing the ensemble variance floor.",
+        "This is the classic nested parallelism anti-pattern. If the outer search spawns N processes and each model fit attempts to spawn N subprocesses, the operating system is overwhelmed by N² processes competing for hardware cores and thrashing L3 cache. The fix is to parallelize outer search (GridSearchCV(n_jobs=-1)) and keep the inner estimator single-threaded (RandomForestClassifier(n_jobs=1)), or vice versa.",
     },
   },
 

@@ -164,6 +164,73 @@ describe("Random Forest Mathematical Algorithms", () => {
     expect(weightedLoss).toBeCloseTo(4.3, 5);
   });
 
+  it("calculates min_impurity_decrease global split criterion and threshold gating", () => {
+    const nTotal = 1000;
+    const nt = 100;
+    const ntL = 50;
+    const ntR = 50;
+
+    // Parent: 60 Class 0, 40 Class 1
+    const pParent0 = 60 / 100;
+    const pParent1 = 40 / 100;
+    const parentGini = 1 - (pParent0 ** 2 + pParent1 ** 2); // 0.48
+
+    // Left child: 45 Class 0, 5 Class 1
+    const pLeft0 = 45 / 50;
+    const pLeft1 = 5 / 50;
+    const leftGini = 1 - (pLeft0 ** 2 + pLeft1 ** 2); // 0.18
+
+    // Right child: 15 Class 0, 35 Class 1
+    const pRight0 = 15 / 50;
+    const pRight1 = 35 / 50;
+    const rightGini = 1 - (pRight0 ** 2 + pRight1 ** 2); // 0.42
+
+    const weightedChildGini = (ntL / nt) * leftGini + (ntR / nt) * rightGini; // 0.5 * 0.18 + 0.5 * 0.42 = 0.30
+    const localImpurityDecrease = parentGini - weightedChildGini; // 0.18
+
+    const deltaI = (nt / nTotal) * localImpurityDecrease; // 0.1 * 0.18 = 0.018
+
+    expect(parentGini).toBeCloseTo(0.48, 4);
+    expect(leftGini).toBeCloseTo(0.18, 4);
+    expect(rightGini).toBeCloseTo(0.42, 4);
+    expect(localImpurityDecrease).toBeCloseTo(0.18, 4);
+    expect(deltaI).toBeCloseTo(0.018, 4);
+
+    // Gating check
+    const minImpurityDecrease = 0.025;
+    const isSplitAccepted = deltaI >= minImpurityDecrease;
+    expect(isSplitAccepted).toBe(false); // Correctly rejects weak split
+  });
+
+  it("calculates cost-complexity pruning objective R_alpha(T) and effective alpha", () => {
+    // Tree T with misclassification error R(T) = 12.0 and |T| = 5 leaves
+    const rT = 12.0;
+    const numLeaves = 5;
+    const alpha = 2.5;
+
+    const costComplexity = rT + alpha * numLeaves;
+    expect(costComplexity).toBe(12.0 + 2.5 * 5); // 24.5
+
+    // Node t error if collapsed R(t) = 18.0 with |Tt| = 4 leaves in subtree
+    const rNode = 18.0;
+    const subLeaves = 4;
+    const alphaEff = (rNode - rT) / (subLeaves - 1);
+    expect(alphaEff).toBeCloseTo((18.0 - 12.0) / 3, 4); // 2.0
+
+    // If pruning parameter ccp_alpha = 2.5 >= alphaEff = 2.0, subtree collapses
+    expect(alpha >= alphaEff).toBe(true);
+  });
+
+  it("calculates standard max_features subset rules for classification and regression", () => {
+    const pFeatures = 30;
+
+    const classificationMaxFeatures = Math.floor(Math.sqrt(pFeatures));
+    const regressionBreimanRecommendation = Math.floor(pFeatures / 3);
+
+    expect(classificationMaxFeatures).toBe(5); // floor(sqrt(30)) = 5
+    expect(regressionBreimanRecommendation).toBe(10); // floor(30 / 3) = 10
+  });
+
   it("verifies numerical transformations for Random Oversampling and Undersampling", () => {
     // Random Oversampling: 900 Maj, 100 Min -> 900 Maj, 900 Min
     const nMajInit = 900;
