@@ -22,6 +22,7 @@ import {
   Callout,
 } from "@/components/lab/primitives";
 import { Button } from "@/components/ui/button";
+import { PythonRecipesModule } from "@/components/lab/PythonRecipesModule";
 
 export const Route = createFileRoute("/python-implementation")({
   head: () => ({
@@ -447,6 +448,9 @@ function PythonTutorialPage() {
           ]}
         />
       </section>
+
+      {/* Production ML Engineering Recipes */}
+      <PythonRecipesModule />
 
       {/* Links to Projects */}
       <div className="mt-14 grid gap-4 sm:grid-cols-2">

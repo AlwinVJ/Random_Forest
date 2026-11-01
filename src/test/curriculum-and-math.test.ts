@@ -256,6 +256,68 @@ describe("Random Forest Mathematical Algorithms", () => {
     expect(nTotalUnder).toBe(400);
     expect(discardedMaj).toBe(9800);
   });
+
+  it("calculates Brier Score probability calibration metric", () => {
+    // 3 samples: y = [1, 0, 1], p_hat = [0.8, 0.2, 0.6]
+    const yTrue = [1, 0, 1];
+    const pHat = [0.8, 0.2, 0.6];
+
+    const squaredErrors = yTrue.map((y, i) => Math.pow(pHat[i] - y, 2));
+    const brier = squaredErrors.reduce((a, b) => a + b, 0) / yTrue.length;
+
+    // (0.8 - 1)^2 = 0.04; (0.2 - 0)^2 = 0.04; (0.6 - 1)^2 = 0.16; sum = 0.24; mean = 0.08
+    expect(brier).toBeCloseTo(0.08, 5);
+  });
+
+  it("calculates Bayes Optimal Decision Threshold under asymmetric costs", () => {
+    const cFP = 300; // False Positive: $300 interest loss
+    const cFN = 12000; // False Negative: $12,000 defaulted loan
+
+    const tauOpt = cFP / (cFP + cFN); // 300 / 12300 ~ 0.02439
+
+    expect(tauOpt).toBeCloseTo(0.02439, 4);
+    expect(tauOpt).toBeLessThan(0.05); // Significantly lower than default 0.50
+  });
+
+  it("calculates Parallel Speedup, Efficiency, and Amdahl's Law bounds", () => {
+    const t1 = 12.8; // 1 core baseline runtime (seconds)
+    const t4 = 3.84; // 4 cores runtime (seconds)
+    const p = 4;
+
+    const speedup = t1 / t4; // 12.8 / 3.84 = 3.333x
+    const efficiency = speedup / p; // 3.333 / 4 = 0.8333 (83.33%)
+
+    expect(speedup).toBeCloseTo(3.333, 3);
+    expect(efficiency).toBeCloseTo(0.8333, 3);
+
+    // Amdahl's Law: 90% parallel fraction (s = 0.90), 10% serial fraction (1-s = 0.10)
+    const s = 0.90;
+    const amdahlSpeedup4 = 1 / ((1 - s) + s / 4); // 1 / (0.10 + 0.225) = 1 / 0.325 = 3.077x
+    const amdahlSpeedupInf = 1 / (1 - s); // 1 / 0.10 = 10x max limit
+
+    expect(amdahlSpeedup4).toBeCloseTo(3.0769, 3);
+    expect(amdahlSpeedupInf).toBeCloseTo(10.0, 5);
+  });
+
+  it("calculates Population Stability Index (PSI) for covariate drift detection", () => {
+    // 3 bins: baseline P and live production Q
+    const pBaseline = [0.50, 0.30, 0.20];
+    const qLive     = [0.45, 0.35, 0.20];
+
+    let psi = 0;
+    for (let b = 0; b < pBaseline.length; b++) {
+      const p = pBaseline[b];
+      const q = qLive[b];
+      psi += (p - q) * Math.log(p / q);
+    }
+
+    // bin 0: (0.50 - 0.45) * ln(0.50 / 0.45) = 0.05 * ln(1.1111) = 0.05 * 0.10536 = 0.005268
+    // bin 1: (0.30 - 0.35) * ln(0.30 / 0.35) = -0.05 * ln(0.8571) = -0.05 * -0.15415 = 0.007707
+    // bin 2: (0.20 - 0.20) * ln(1) = 0
+    // Total PSI = ~0.012975 < 0.10 (stable, no drift)
+    expect(psi).toBeCloseTo(0.01298, 4);
+    expect(psi).toBeLessThan(0.10); // Standard threshold for stable distribution
+  });
 });
 
 describe("Curriculum Completeness & Integrity", () => {
