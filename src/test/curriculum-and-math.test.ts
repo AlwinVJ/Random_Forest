@@ -2,6 +2,20 @@ import { describe, expect, it } from "vitest";
 import { lessons } from "@/content/lessons";
 import { labs } from "@/content/labs";
 import { navGroups, allNavItems } from "@/content/nav";
+import { assessmentQuestions } from "@/content/assessment-questions";
+import {
+  calculateMCC,
+  generateSmoteInterpolation,
+  calculateTreeShapComplexity,
+  calculateGini,
+  calculateEntropy,
+  calculateBrierScore,
+  calculateBayesOptimalThreshold,
+  calculateSpeedup,
+  calculateParallelEfficiency,
+  calculateAmdahlSpeedup,
+  calculatePSI,
+} from "@/lib/math-utils";
 
 describe("Random Forest Mathematical Algorithms", () => {
   it("calculates exact Gini Impurity for pure and mixed nodes", () => {
@@ -378,5 +392,231 @@ describe("Curriculum Completeness & Integrity", () => {
   it("ensures navigation groups cover all syllabus paths", () => {
     expect(navGroups.length).toBe(6);
     expect(allNavItems.length).toBeGreaterThanOrEqual(23);
+  });
+});
+
+describe("Matthews Correlation Coefficient (MCC) Algorithmic Verification", () => {
+  it("Test A: validates perfect classification produces MCC = +1.0", () => {
+    const mcc = calculateMCC(50, 50, 0, 0);
+    expect(mcc).toBe(1.0);
+  });
+
+  it("Test B: validates completely inverted classification produces MCC = -1.0", () => {
+    const mcc = calculateMCC(0, 0, 50, 50);
+    expect(mcc).toBe(-1.0);
+  });
+
+  it("Test C: validates no predictive correlation produces MCC = 0.0", () => {
+    const mcc = calculateMCC(50, 50, 50, 50);
+    expect(mcc).toBe(0.0);
+  });
+
+  it("Test D: validates realistic imbalanced classification against independent calculation", () => {
+    const tp = 80;
+    const tn = 9800;
+    const fp = 100;
+    const fn = 20;
+
+    const mcc = calculateMCC(tp, tn, fp, fn);
+    const expected = (80 * 9800 - 100 * 20) / Math.sqrt(180 * 100 * 9900 * 9820);
+    expect(mcc).toBeCloseTo(expected, 6);
+    expect(mcc).toBeCloseTo(0.5911, 3);
+  });
+
+  it("Test E: validates zero denominator handles gracefully and returns 0.0 without NaN", () => {
+    // Trivial classifier predicting all negative (TP=0, FP=0)
+    const mcc1 = calculateMCC(0, 9900, 0, 100);
+    expect(mcc1).toBe(0.0);
+    expect(Number.isNaN(mcc1)).toBe(false);
+
+    // Completely empty confusion matrix
+    const mcc2 = calculateMCC(0, 0, 0, 0);
+    expect(mcc2).toBe(0.0);
+    expect(Number.isNaN(mcc2)).toBe(false);
+  });
+
+  it("Test F: rejects negative matrix inputs with RangeError", () => {
+    expect(() => calculateMCC(-1, 50, 10, 5)).toThrow(RangeError);
+  });
+});
+
+describe("SMOTE Linear Vector Interpolation Algorithmic Verification", () => {
+  it("Test A: validates midpoint interpolation with lambda = 0.5", () => {
+    const xi = [2, 4];
+    const xnn = [6, 8];
+    const xNew = generateSmoteInterpolation(xi, xnn, 0.5);
+
+    expect(xNew).toEqual([4, 6]);
+  });
+
+  it("Test B: validates zero interpolation coefficient returns exact seed xi", () => {
+    const xi = [3.5, 7.2];
+    const xnn = [9.1, 1.4];
+    const xNew = generateSmoteInterpolation(xi, xnn, 0.0);
+
+    expect(xNew).toEqual(xi);
+  });
+
+  it("Test C: validates full interpolation coefficient returns exact neighbor xnn", () => {
+    const xi = [3.5, 7.2];
+    const xnn = [9.1, 1.4];
+    const xNew = generateSmoteInterpolation(xi, xnn, 1.0);
+
+    expect(xNew).toEqual(xnn);
+  });
+
+  it("Test D: validates multi-dimensional interpolation across >= 3 dimensions", () => {
+    const xi = [2.0, 4.0, 10.0];
+    const xnn = [6.0, 8.0, 2.0];
+    const lambda = 0.25;
+
+    const xNew = generateSmoteInterpolation(xi, xnn, lambda);
+
+    // xi + 0.25 * (xnn - xi):
+    // [2 + 0.25(4), 4 + 0.25(4), 10 + 0.25(-8)] = [3.0, 5.0, 8.0]
+    expect(xNew[0]).toBeCloseTo(3.0, 5);
+    expect(xNew[1]).toBeCloseTo(5.0, 5);
+    expect(xNew[2]).toBeCloseTo(8.0, 5);
+  });
+
+  it("Test E: rejects invalid interpolation coefficient lambda outside [0, 1]", () => {
+    const xi = [1, 2];
+    const xnn = [3, 4];
+
+    expect(() => generateSmoteInterpolation(xi, xnn, -0.01)).toThrow(RangeError);
+    expect(() => generateSmoteInterpolation(xi, xnn, 1.05)).toThrow(RangeError);
+    expect(() => generateSmoteInterpolation(xi, xnn, NaN)).toThrow(RangeError);
+  });
+
+  it("Test F: rejects vector shape mismatch with Error", () => {
+    const xi = [1, 2];
+    const xnn = [3, 4, 5];
+
+    expect(() => generateSmoteInterpolation(xi, xnn, 0.5)).toThrow(
+      "Vector dimension mismatch: xi has dimension 2, but xnn has dimension 3."
+    );
+  });
+});
+
+describe("TreeSHAP Computational Complexity Formulation Verification", () => {
+  it("Test 1: validates that increasing tree count T strictly increases complexity estimate", () => {
+    const c100 = calculateTreeShapComplexity(100, 32, 10);
+    const c200 = calculateTreeShapComplexity(200, 32, 10);
+
+    expect(c200).toBeGreaterThan(c100);
+    expect(c200 / c100).toBeCloseTo(2.0, 5); // Linear in trees
+  });
+
+  it("Test 2: validates that increasing maximum leaf count L strictly increases complexity estimate", () => {
+    const c32 = calculateTreeShapComplexity(100, 32, 10);
+    const c64 = calculateTreeShapComplexity(100, 64, 10);
+
+    expect(c64).toBeGreaterThan(c32);
+    expect(c64 / c32).toBeCloseTo(2.0, 5); // Linear in leaves
+  });
+
+  it("Test 3: validates that increasing depth D scales complexity quadratically D^2", () => {
+    const cDepth10 = calculateTreeShapComplexity(100, 32, 10);
+    const cDepth20 = calculateTreeShapComplexity(100, 32, 20);
+
+    expect(cDepth20).toBeGreaterThan(cDepth10);
+    expect(cDepth20 / cDepth10).toBeCloseTo(4.0, 5); // Quadratic: (20/10)^2 = 4
+  });
+
+  it("Test 4: validates zero or negative inputs return 0 safely", () => {
+    expect(calculateTreeShapComplexity(0, 32, 10)).toBe(0);
+    expect(calculateTreeShapComplexity(-5, 32, 10)).toBe(0);
+    expect(calculateTreeShapComplexity(100, 0, 10)).toBe(0);
+    expect(calculateTreeShapComplexity(100, 32, 0)).toBe(0);
+  });
+
+  it("Test 5: produces exact expected value for known numerical reference", () => {
+    // T = 100, L = 32, D = 10 -> 100 * 32 * 10^2 = 100 * 32 * 100 = 320,000
+    const knownComplexity = calculateTreeShapComplexity(100, 32, 10);
+    expect(knownComplexity).toBe(320000);
+  });
+});
+
+describe("Pure Math Utility Functions Verification", () => {
+  it("calculates Gini and Entropy correctly from class counts", () => {
+    // Pure node
+    expect(calculateGini([100, 0])).toBe(0.0);
+    expect(calculateEntropy([100, 0])).toBe(0.0);
+
+    // Balanced 50:50 node
+    expect(calculateGini([50, 50])).toBe(0.5);
+    expect(calculateEntropy([50, 50])).toBe(1.0);
+  });
+
+  it("calculates Brier Score and Bayes Optimal Threshold correctly", () => {
+    const brier = calculateBrierScore([1, 0, 1], [0.8, 0.2, 0.6]);
+    expect(brier).toBeCloseTo(0.08, 5);
+
+    const tau = calculateBayesOptimalThreshold(300, 12000);
+    expect(tau).toBeCloseTo(300 / 12300, 5);
+  });
+
+  it("calculates Speedup, Efficiency, and PSI correctly", () => {
+    const speedup = calculateSpeedup(12.8, 3.84);
+    expect(speedup).toBeCloseTo(3.3333, 4);
+
+    const eff = calculateParallelEfficiency(speedup, 4);
+    expect(eff).toBeCloseTo(0.8333, 4);
+
+    const amdahl = calculateAmdahlSpeedup(0.9, 4);
+    expect(amdahl).toBeCloseTo(3.0769, 4);
+
+    const psi = calculatePSI([0.5, 0.3, 0.2], [0.45, 0.35, 0.2]);
+    expect(psi).toBeCloseTo(0.01298, 4);
+  });
+});
+
+describe("Assessment Question Bank Integrity & Distribution Verification", () => {
+  it("contains exactly 50 validated assessment questions", () => {
+    expect(assessmentQuestions).toHaveLength(50);
+  });
+
+  it("satisfies the exact difficulty distribution: 15 Beginner, 20 Intermediate, 15 Advanced", () => {
+    const beginner = assessmentQuestions.filter((q) => q.difficulty === "Beginner");
+    const intermediate = assessmentQuestions.filter((q) => q.difficulty === "Intermediate");
+    const advanced = assessmentQuestions.filter((q) => q.difficulty === "Advanced");
+
+    expect(beginner).toHaveLength(15);
+    expect(intermediate).toHaveLength(20);
+    expect(advanced).toHaveLength(15);
+    expect(beginner.length + intermediate.length + advanced.length).toBe(50);
+  });
+
+  it("ensures all question IDs are unique and properly prefixed", () => {
+    const ids = assessmentQuestions.map((q) => q.id);
+    const uniqueIds = new Set(ids);
+    expect(uniqueIds.size).toBe(50);
+
+    for (const q of assessmentQuestions) {
+      expect(["c-", "m-", "a-", "p-"].some((prefix) => q.id.startsWith(prefix))).toBe(true);
+    }
+  });
+
+  it("ensures every question has exactly 4 options, a valid answerIndex, and non-empty explanation", () => {
+    for (const q of assessmentQuestions) {
+      expect(q.options).toHaveLength(4);
+      expect(q.answerIndex).toBeGreaterThanOrEqual(0);
+      expect(q.answerIndex).toBeLessThan(4);
+      expect(q.question.trim().length).toBeGreaterThan(15);
+      expect(q.explanation.trim().length).toBeGreaterThan(20);
+      q.options.forEach((opt) => expect(opt.trim().length).toBeGreaterThan(0));
+    }
+  });
+
+  it("covers all 4 curriculum categories with comprehensive depth", () => {
+    const conceptual = assessmentQuestions.filter((q) => q.category === "Conceptual");
+    const mathematical = assessmentQuestions.filter((q) => q.category === "Mathematical");
+    const algorithmic = assessmentQuestions.filter((q) => q.category === "Algorithmic");
+    const practical = assessmentQuestions.filter((q) => q.category === "Practical");
+
+    expect(conceptual.length).toBe(10);
+    expect(mathematical.length).toBe(12);
+    expect(algorithmic.length).toBe(14);
+    expect(practical.length).toBe(14);
   });
 });
