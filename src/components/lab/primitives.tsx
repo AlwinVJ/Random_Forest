@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { Check, ChevronRight, Clock, Copy, Info, Lightbulb, AlertTriangle, ArrowRight, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Difficulty, Formula } from "@/content/lessons";
+import { MathView } from "./MathView";
 
 /* ---------- Badges ---------- */
 export function Eyebrow({ children }: { children: ReactNode }) {
@@ -94,10 +95,10 @@ export function MathPanel({ formula, className }: { formula: Formula; className?
     <div className={cn("relative overflow-hidden rounded-xl border border-border bg-secondary/50", className)}>
       <div className="flex items-center justify-between border-b border-border px-4 py-2">
         <span className="text-xs font-medium text-muted-foreground">{formula.label}</span>
-        <span className="font-mono text-[10px] text-primary">∑ EQUATION</span>
+        <span className="font-mono text-[10px] text-primary">∑ FORMULA</span>
       </div>
-      <div className="bg-grid px-4 py-6 text-center">
-        <code className="font-mono text-base text-foreground md:text-lg">{formula.expr}</code>
+      <div className="bg-grid px-4 py-5 text-center overflow-x-auto">
+        <MathView math={formula.expr} display />
       </div>
       {formula.note && <div className="border-t border-border px-4 py-2 text-xs text-muted-foreground">{formula.note}</div>}
     </div>

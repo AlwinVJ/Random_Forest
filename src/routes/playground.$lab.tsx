@@ -1,8 +1,14 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { ArrowLeft, Play, RotateCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Callout, PageHeader, PlaceholderViz } from "@/components/lab/primitives";
+import { PageHeader } from "@/components/lab/primitives";
 import { labs } from "@/content/labs";
+import { BootstrapLab } from "@/components/lab/experiments/BootstrapLab";
+import { FeatureSelectionLab } from "@/components/lab/experiments/FeatureSelectionLab";
+import { VotingLab } from "@/components/lab/experiments/VotingLab";
+import { RegressionLab } from "@/components/lab/experiments/RegressionLab";
+import { BiasVarianceLab } from "@/components/lab/experiments/BiasVarianceLab";
+import { TreeSplittingLab } from "@/components/lab/experiments/TreeSplittingLab";
 
 export const Route = createFileRoute("/playground/$lab")({
   loader: ({ params }) => {
@@ -13,37 +19,77 @@ export const Route = createFileRoute("/playground/$lab")({
   head: ({ loaderData }) => {
     const lab = labs.find((l) => l.id === loaderData?.id);
     const title = lab ? `${lab.title} — Random Forest Lab` : "Lab — Random Forest Lab";
-    return { meta: [{ title }, { name: "description", content: lab?.desc ?? "" }, { property: "og:title", content: title }, { property: "og:description", content: lab?.desc ?? "" }] };
+    return {
+      meta: [
+        { title },
+        { name: "description", content: lab?.desc ?? "" },
+        { property: "og:title", content: title },
+        { property: "og:description", content: lab?.desc ?? "" },
+      ],
+    };
   },
-  component: LabPage,
+  component: LabRunnerPage,
 });
 
-function LabPage() {
+function LabRunnerPage() {
   const { id } = Route.useLoaderData();
   const lab = labs.find((l) => l.id === id)!;
+
+  const currentIdx = labs.findIndex((l) => l.id === id);
+  const nextLab = currentIdx < labs.length - 1 ? labs[currentIdx + 1] : null;
+
+  const renderExperiment = () => {
+    switch (id) {
+      case "bootstrap":
+        return <BootstrapLab />;
+      case "feature-selection":
+        return <FeatureSelectionLab />;
+      case "voting":
+        return <VotingLab />;
+      case "regression":
+        return <RegressionLab />;
+      case "bias-variance":
+        return <BiasVarianceLab />;
+      case "tree-splitting":
+        return <TreeSplittingLab />;
+      default:
+        return <BootstrapLab />;
+    }
+  };
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 md:px-8">
-      <PageHeader crumbs={[{ label: "Playground", to: "/playground" }, { label: lab.title }]} eyebrow="Lab bench" title={lab.title} intro={lab.desc} />
-      <div className="mt-8 grid gap-5 lg:grid-cols-[280px_1fr]">
-        <div className="surface space-y-5 p-5">
-          <div className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Parameters</div>
-          {["Number of trees", "Sample size", "Max depth"].map((p) => (
-            <div key={p}>
-              <div className="mb-2 flex justify-between text-sm"><span>{p}</span><span className="font-mono text-muted-foreground">—</span></div>
-              <div className="h-1.5 rounded-full bg-secondary"><div className="h-full w-1/2 rounded-full bg-primary/50" /></div>
-            </div>
-          ))}
-          <div className="flex gap-2">
-            <Button size="sm" disabled><Play />Run</Button>
-            <Button size="sm" variant="outline" disabled><RotateCcw />Reset</Button>
-          </div>
-        </div>
-        <div className="space-y-4">
-          <PlaceholderViz label="Simulation canvas" height={360} />
-          <Callout type="warning" title="Coming in the next development phase">This simulator's controls and visualisation will become interactive in Phase 2.</Callout>
-        </div>
+      <PageHeader
+        crumbs={[
+          { label: "Course", to: "/" },
+          { label: "Interactive Playground", to: "/playground" },
+          { label: lab.shortTitle },
+        ]}
+        eyebrow="Interactive Experiment"
+        title={lab.title}
+        intro={lab.desc}
+      />
+
+      <div className="mt-8">
+        {renderExperiment()}
       </div>
-      <Button asChild variant="ghost" className="mt-8"><Link to="/playground"><ArrowLeft />Back to Playground</Link></Button>
+
+      {/* Navigation Footer */}
+      <div className="mt-14 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border pt-8">
+        <Button asChild variant="outline" size="sm">
+          <Link to="/playground">
+            <ArrowLeft className="size-3.5 mr-1" /> Back to Laboratory Index
+          </Link>
+        </Button>
+
+        {nextLab && (
+          <Button asChild size="sm">
+            <Link to="/playground/$lab" params={{ lab: nextLab.id }}>
+              Next Experiment: {nextLab.shortTitle} <ArrowRight className="size-3.5 ml-1" />
+            </Link>
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

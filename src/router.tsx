@@ -1,12 +1,22 @@
 import { QueryClient } from "@tanstack/react-query";
-import { createRouter } from "@tanstack/react-router";
+import { createRouter, createHashHistory } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
 export const getRouter = () => {
-  const queryClient = new QueryClient();
+  const hashHistory = createHashHistory();
 
   const router = createRouter({
     routeTree,
+    history: hashHistory,
     context: { queryClient },
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
@@ -14,3 +24,9 @@ export const getRouter = () => {
 
   return router;
 };
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: ReturnType<typeof getRouter>;
+  }
+}
