@@ -1,0 +1,175 @@
+{
+  "dataset": {
+    "generator": "sklearn.datasets.make_classification",
+    "n_samples": 10000,
+    "n_features": 20,
+    "n_informative": 10,
+    "n_redundant": 4,
+    "class_distribution": "98% Class 0 (9,800), 2% Class 1 (200)",
+    "split": "75% Stratified Train (7,500: 7,350 Maj, 150 Min), 25% Test (2,500: 2,450 Maj, 50 Min)",
+    "random_state": 42
+  },
+  "models": [
+    {
+      "id": "baseline",
+      "name": "Baseline Random Forest (class_weight=None)",
+      "shortName": "Baseline RF",
+      "category": "Baseline",
+      "accuracy": 0.9828,
+      "precision": 1.0,
+      "recall": 0.2456,
+      "specificity": 1.0,
+      "f1": 0.3944,
+      "mcc": 0.4913,
+      "balancedAccuracy": 0.6228,
+      "rocAuc": 0.8534,
+      "prAuc": 0.5333,
+      "cm": {
+        "tn": 2443,
+        "fp": 0,
+        "fn": 43,
+        "tp": 14
+      },
+      "trainSamples": "7,500 (7,350 Maj + 150 Min)",
+      "description": "Standard unweighted Random Forest. Achieves high nominal accuracy but low recall on rare positive events as minority splits minimize overall Gini impurity."
+    },
+    {
+      "id": "class_weight_balanced",
+      "name": "Random Forest (class_weight='balanced')",
+      "shortName": "RF Balanced Weight",
+      "category": "Cost-Sensitive",
+      "accuracy": 0.9804,
+      "precision": 0.9,
+      "recall": 0.1579,
+      "specificity": 0.9996,
+      "f1": 0.2687,
+      "mcc": 0.3724,
+      "balancedAccuracy": 0.5787,
+      "rocAuc": 0.8511,
+      "prAuc": 0.4554,
+      "cm": {
+        "tn": 2442,
+        "fp": 1,
+        "fn": 48,
+        "tp": 9
+      },
+      "trainSamples": "7,500 (No extra rows)",
+      "description": "Scales Gini impurity split criteria inversely proportional to global class frequencies w_c = N / (K * N_c), boosting minority sample influence during node splits."
+    },
+    {
+      "id": "class_weight_subsample",
+      "name": "Random Forest (class_weight='balanced_subsample')",
+      "shortName": "RF Balanced Subsample",
+      "category": "Cost-Sensitive",
+      "accuracy": 0.9812,
+      "precision": 0.9167,
+      "recall": 0.193,
+      "specificity": 0.9996,
+      "f1": 0.3188,
+      "mcc": 0.4159,
+      "balancedAccuracy": 0.5963,
+      "rocAuc": 0.8469,
+      "prAuc": 0.45,
+      "cm": {
+        "tn": 2442,
+        "fp": 1,
+        "fn": 46,
+        "tp": 11
+      },
+      "trainSamples": "7,500 (No extra rows)",
+      "description": "Computes class weights dynamically inside each bootstrap sample, automatically compensating for localized minority sampling variations across trees."
+    },
+    {
+      "id": "random_oversampling",
+      "name": "Random Oversampling (ROS) + Random Forest",
+      "shortName": "Random Oversampling",
+      "category": "Oversampling",
+      "accuracy": 0.9812,
+      "precision": 0.8125,
+      "recall": 0.2281,
+      "specificity": 0.9988,
+      "f1": 0.3562,
+      "mcc": 0.4246,
+      "balancedAccuracy": 0.6134,
+      "rocAuc": 0.8301,
+      "prAuc": 0.4441,
+      "cm": {
+        "tn": 2440,
+        "fp": 3,
+        "fn": 44,
+        "tp": 13
+      },
+      "trainSamples": "14,700 (7,350 Maj + 7,350 Min dup)",
+      "description": "Duplicates minority training samples with replacement to reach parity. Increases minority sensitivity, but identical replicates risk narrow leaf overfitting."
+    },
+    {
+      "id": "random_undersampling",
+      "name": "Random Undersampling (RUS) + Random Forest",
+      "shortName": "Random Undersampling",
+      "category": "Undersampling",
+      "accuracy": 0.8212,
+      "precision": 0.0886,
+      "recall": 0.7368,
+      "specificity": 0.8232,
+      "f1": 0.1582,
+      "mcc": 0.2132,
+      "balancedAccuracy": 0.78,
+      "rocAuc": 0.8466,
+      "prAuc": 0.3633,
+      "cm": {
+        "tn": 2011,
+        "fp": 432,
+        "fn": 15,
+        "tp": 42
+      },
+      "trainSamples": "300 (150 Maj + 150 Min)",
+      "description": "Randomly discards majority class instances to match minority count. Trains extremely fast but incurs massive information loss by discarding majority observations."
+    },
+    {
+      "id": "smote",
+      "name": "SMOTE + Random Forest",
+      "shortName": "SMOTE + RF",
+      "category": "Synthetic",
+      "accuracy": 0.9776,
+      "precision": 0.5102,
+      "recall": 0.4386,
+      "specificity": 0.9902,
+      "f1": 0.4717,
+      "mcc": 0.4617,
+      "balancedAccuracy": 0.7144,
+      "rocAuc": 0.8599,
+      "prAuc": 0.4443,
+      "cm": {
+        "tn": 2419,
+        "fp": 24,
+        "fn": 32,
+        "tp": 25
+      },
+      "trainSamples": "14,700 (7,350 Maj + 7,350 Synthetic)",
+      "description": "Generates synthetic minority examples via linear interpolation between k-nearest neighbors in feature space, constructing continuous minority decision regions."
+    },
+    {
+      "id": "balanced_rf",
+      "name": "Balanced Random Forest (imblearn)",
+      "shortName": "Balanced RF",
+      "category": "Ensemble Downsampling",
+      "accuracy": 0.8764,
+      "precision": 0.1205,
+      "recall": 0.7018,
+      "specificity": 0.8805,
+      "f1": 0.2057,
+      "mcc": 0.2561,
+      "balancedAccuracy": 0.7911,
+      "rocAuc": 0.8549,
+      "prAuc": 0.4957,
+      "cm": {
+        "tn": 2151,
+        "fp": 292,
+        "fn": 17,
+        "tp": 40
+      },
+      "trainSamples": "7,500 (Bootstraps downsampled per-tree)",
+      "description": "Draws a bootstrap sample of the minority class and an equal-sized random subsample of the majority class independently for every individual tree in the forest."
+    }
+  ]
+}

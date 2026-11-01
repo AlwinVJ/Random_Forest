@@ -1532,12 +1532,16 @@ print("First 3 OOB Probabilities:\\n", rf.oob_decision_function_[:3])`,
     intuition:
       "If you want to know who is the most essential player on a basketball team, you can look at two things: (1) How many game-winning points they score when on the court (MDI), or (2) How terribly the team performs when that specific player is benched (Permutation Importance).",
     theory: [
-      "Mean Decrease in Impurity (MDI / Gini Importance): Sums the total reduction in impurity (Gini or MSE) brought by all splits on a given feature, weighted by the proportion of samples reaching that node, averaged across all B trees.",
-      "MDI Cardinality Bias: MDI is heavily biased toward high-cardinality features (features with many unique values, such as customer IDs or fine timestamps), because random noise with many thresholds can easily overfit and appear to reduce impurity during training.",
-      "Permutation Feature Importance (Mean Decrease Accuracy / MDA): Evaluates baseline model score on validation data, shuffles the values of a single feature column to destroy its relationship with the target, and measures the resulting drop in model performance.",
-      "Correlated Features Effect: When two features are strongly collinear, MDI and permutation importance split the importance between them, making both appear less important than they truly are.",
+      "Mean Decrease in Impurity (MDI / Gini Importance): Sums the total reduction in impurity (Gini or MSE) brought by all splits on a given feature, weighted by the proportion of samples reaching that node, averaged across all B trees. While fast, MDI evaluates splits on training data.",
+      "High-Cardinality Bias in MDI: MDI is heavily biased toward continuous features and high-cardinality categorical variables (e.g. random ID numbers or timestamps). Greedy tree algorithms have thousands of split thresholds to choose from, allowing trees to find spurious sample separations that reduce training impurity while carrying zero generalizable signal.",
+      "Permutation Feature Importance (Mean Decrease Accuracy / MDA): Evaluates baseline model score on held-out validation data, randomly permutes (shuffles) values of a single feature column to destroy its relationship with the target, and measures the resulting score drop. Because it tests out-of-sample data, it is completely immune to high-cardinality bias.",
+      "Correlated Features Effect: When two or more features are strongly collinear, MDI and permutation importance split the credit between them, making each appear only half as important as it truly is. Grouped permutation or hierarchical cluster pruning resolves this dilution.",
+      "Partial Dependence Plots (PDP): Shows the marginal effect of one or two features on the model's predicted outcome by integrating out all other features: f_S(x_S) = (1/N) ∑ f(x_S, x_i,C). Assumes feature independence.",
+      "Individual Conditional Expectation (ICE): Plots the predicted response as a function of the feature for each individual observation separately. Unmasks heterogeneous subpopulation effects and crossover interactions that average PDP lines obscure.",
+      "SHAP (Shapley Additive exPlanations): Uses cooperative game theory to compute the unique fair attribution φ_j(x) satisfying Efficiency, Symmetry, Dummy Player, and Additivity axioms. TreeSHAP evaluates tree paths in O(T · L · D²) polynomial time, unlike model-agnostic KernelSHAP which requires O(2^p) exponential evaluations.",
+      "Probability Calibration: Random Forest voting fractions are an uncalibrated heuristic—voting averages of diverse trees pull predicted probabilities away from 0 and 1 toward the center (e.g. 0.2–0.8). CalibratedClassifierCV fits Platt sigmoid scaling or non-parametric isotonic regression over cross-validated out-of-fold predictions to minimize Brier score loss without leaking test data.",
     ],
-    readTime: "15 min",
+    readTime: "20 min",
     difficulty: "Advanced",
     formulas: [
       {
@@ -1548,7 +1552,22 @@ print("First 3 OOB Probabilities:\\n", rf.oob_decision_function_[:3])`,
       {
         label: "Permutation Feature Importance (MDA)",
         expr: "\\operatorname{PFI}(j) = \\operatorname{Score}(D_{\\text{val}}) - \\operatorname{Score}(D_{\\text{val}}^{\\text{perm}(j)})",
-        note: "Drop in validation metric when feature j is randomly permuted.",
+        note: "Drop in validation metric when feature j is randomly permuted on held-out data.",
+      },
+      {
+        label: "Partial Dependence Function (PDP)",
+        expr: "\\hat{f}_S(x_S) = \\frac{1}{N} \\sum_{i=1}^N \\hat{f}(x_S, x_{i, C})",
+        note: "Marginal effect of target feature subset S after integrating over complement features C.",
+      },
+      {
+        label: "TreeSHAP Complexity Bound (Lundberg et al., 2020)",
+        expr: "\\mathcal{O}(T \\cdot L \\cdot D^2) \\ll \\mathcal{O}(2^p)",
+        note: "Polynomial TreeSHAP evaluation across T trees, max leaves L, depth D vs exponential KernelSHAP.",
+      },
+      {
+        label: "Probability Calibration Brier Score",
+        expr: "\\operatorname{BS} = \\frac{1}{N} \\sum_{i=1}^N (p_i - y_i)^2",
+        note: "Mean squared probability error; lower is better. CalibratedClassifierCV directly minimizes this.",
       },
     ],
     workedExample: {
@@ -1577,7 +1596,9 @@ print("First 3 OOB Probabilities:\\n", rf.oob_decision_function_[:3])`,
     rfConnection:
       "rf.feature_importances_ in Scikit-Learn computes MDI. permutation_importance from sklearn.inspection computes permutation importance on out-of-sample data.",
     code: `from sklearn.ensemble import RandomForestClassifier
-from sklearn.inspection import permutation_importance
+from sklearn.inspection import permutation_importance, PartialDependenceDisplay
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.metrics import brier_score_loss
 from sklearn.datasets import load_breast_cancer
 from sklearn.model_selection import train_test_split
 import numpy as np
@@ -1591,35 +1612,52 @@ rf.fit(X_train, y_train)
 # 1. Gini Importance (MDI)
 mdi_importances = rf.feature_importances_
 
-# 2. Permutation Importance on Test Data
+# 2. Permutation Importance on Held-out Test Data (Unbiased)
 perm_importance = permutation_importance(rf, X_test, y_test, n_repeats=10, random_state=42)
 
-print(f"Top MDI Feature Index : {np.argmax(mdi_importances)} (Score: {np.max(mdi_importances):.4f})")
-print(f"Top Permutation Feature Index: {np.argmax(perm_importance.importances_mean)} (Score: {np.max(perm_importance.importances_mean):.4f})")`,
+# 3. Partial Dependence (PDP) & Individual Conditional Expectation (ICE)
+# kind="both" renders the aggregate PDP curve alongside individual ICE trajectory curves
+disp = PartialDependenceDisplay.from_estimator(rf, X_test, features=[0, 1], kind="both")
+
+# 4. Probability Calibration (Platt Sigmoid Scaling)
+cal_rf = CalibratedClassifierCV(estimator=rf, method="sigmoid", cv=5)
+cal_rf.fit(X_train, y_train)
+
+brier_raw = brier_score_loss(y_test, rf.predict_proba(X_test)[:, 1])
+brier_cal = brier_score_loss(y_test, cal_rf.predict_proba(X_test)[:, 1])
+
+print(f"Top MDI Feature Index        : {np.argmax(mdi_importances)} (Score: {np.max(mdi_importances):.4f})")
+print(f"Top Permutation Feature Index: {np.argmax(perm_importance.importances_mean)} (Score: {np.max(perm_importance.importances_mean):.4f})")
+print(f"Brier Score (Raw vs Calibrated): {brier_raw:.4f} -> {brier_cal:.4f}")`,
     codeExplanation:
-      "permutation_importance tests on held-out test data, avoiding MDI's high-cardinality training bias.",
+      "Demonstrates MDI, permutation feature importance, joint PDP/ICE generation via PartialDependenceDisplay(kind='both'), and probability calibration with CalibratedClassifierCV minimizing Brier score loss.",
     application:
       "Pharmaceutical drug discovery teams use permutation feature importance to identify which chemical molecular descriptors most strongly inhibit viral replication enzymes.",
     mistakes: [
-      "Relying solely on MDI when features have drastically different cardinalities (e.g. continuous vs binary indicators).",
-      "Equating feature importance with causal inference (importance indicates correlation and predictive utility, not causation).",
+      "Relying solely on MDI when features have drastically different cardinalities (e.g. continuous features vs binary indicators).",
+      "Relying on PDP alone without checking ICE curves when strong feature interactions exist (an average flat PDP line can mask opposing subgroup effects).",
+      "Using raw Random Forest voting fractions as true posterior risk probabilities without probability calibration (e.g. CalibratedClassifierCV).",
+      "Equating feature importance with causal inference (importance indicates predictive association, not causal mechanisms).",
       "Evaluating permutation importance on training data instead of held-out validation data.",
     ],
     prosCons: {
       pros: [
         "MDI is computed automatically during tree training with zero additional latency.",
         "Permutation importance provides a model-agnostic, unbiased reality check.",
-        "Identifies irrelevant noise features for model pruning.",
+        "PDP and ICE reveal global shape and localized interaction heterogeneity.",
+        "TreeSHAP provides axiomatic fair attributions in polynomial time O(T · L · D²).",
       ],
       cons: [
         "MDI is biased toward high-cardinality features.",
         "Collinear features dilute each other's importance scores.",
+        "PDP assumes feature independence, which can produce unrealistic synthetic combinations on correlated data.",
       ],
     },
     takeaways: [
       "MDI measures average training impurity reduction; permutation importance measures test score degradation after shuffling.",
       "Prefer Permutation Feature Importance whenever features have varying cardinalities or numerical scales.",
-      "Feature importance does not imply causal relationships.",
+      "PDP reveals average marginal trends, while ICE exposes individual subpopulation heterogeneity.",
+      "CalibratedClassifierCV maps uncalibrated voting fractions to true empirical posterior probabilities, minimizing Brier score loss.",
     ],
     quiz: {
       prompt: "Why can Mean Decrease in Impurity (MDI) produce severely misleading feature importances on datasets with high-cardinality numerical noise features?",
@@ -1758,10 +1796,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score,
-    f1_score, roc_auc_score, confusion_matrix
+    f1_score, roc_auc_score, average_precision_score, matthews_corrcoef
 )
 from imblearn.over_sampling import RandomOverSampler, SMOTE
 from imblearn.under_sampling import RandomUnderSampler
+from imblearn.ensemble import BalancedRandomForestClassifier
 from imblearn.pipeline import Pipeline as ImbPipeline
 
 # 1. Generate imbalanced dataset (98% Majority Class 0, 2% Minority Class 1)
@@ -1778,7 +1817,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 # Common base Random Forest hyperparameters
 rf_kwargs = {'n_estimators': 200, 'max_depth': 12, 'random_state': 42, 'n_jobs': -1}
 
-# 3. Define the 6 comparison configurations
+# 3. Define the 7 comparison configurations (including Balanced Random Forest)
 pipelines = {
     "Baseline (None)": RandomForestClassifier(**rf_kwargs, class_weight=None),
     "Class Weight ('balanced')": RandomForestClassifier(**rf_kwargs, class_weight="balanced"),
@@ -1786,6 +1825,7 @@ pipelines = {
     "Random Oversampling": ImbPipeline([('ros', RandomOverSampler(random_state=42)), ('rf', RandomForestClassifier(**rf_kwargs))]),
     "Random Undersampling": ImbPipeline([('rus', RandomUnderSampler(random_state=42)), ('rf', RandomForestClassifier(**rf_kwargs))]),
     "SMOTE": ImbPipeline([('smote', SMOTE(k_neighbors=5, random_state=42)), ('rf', RandomForestClassifier(**rf_kwargs))]),
+    "Balanced Random Forest": BalancedRandomForestClassifier(n_estimators=200, max_depth=12, sampling_strategy="auto", random_state=42, n_jobs=-1),
 }
 
 # 4. Train, evaluate, and assemble comparison DataFrame
@@ -1797,17 +1837,19 @@ for name, model in pipelines.items():
     
     benchmark_rows.append({
         "Technique": name,
-        "Accuracy": accuracy_score(y_test, y_pred),
-        "Precision": precision_score(y_test, y_pred, zero_division=0),
-        "Recall": recall_score(y_test, y_pred, zero_division=0),
-        "F1-score": f1_score(y_test, y_pred, zero_division=0),
-        "ROC-AUC": roc_auc_score(y_test, y_prob)
+        "Accuracy": round(accuracy_score(y_test, y_pred), 4),
+        "Precision": round(precision_score(y_test, y_pred, zero_division=0), 4),
+        "Recall": round(recall_score(y_test, y_pred, zero_division=0), 4),
+        "F1-score": round(f1_score(y_test, y_pred, zero_division=0), 4),
+        "MCC": round(matthews_corrcoef(y_test, y_pred), 4),
+        "ROC-AUC": round(roc_auc_score(y_test, y_prob), 4),
+        "PR-AUC": round(average_precision_score(y_test, y_prob), 4)
     })
 
 df_comparison = pd.DataFrame(benchmark_rows)
 print(df_comparison.to_string(index=False))`,
     codeExplanation:
-      "All 6 techniques are trained on the exact same stratified training split and evaluated on the untouched test partition. ImbPipeline encapsulates resampling so it executes strictly on training folds, eliminating data leakage.",
+      "All 7 techniques are trained on the exact same stratified training split and evaluated on the untouched test partition. BalancedRandomForestClassifier downsamples the majority class per-tree, while ImbPipeline encapsulates resampling so it executes strictly on training folds, eliminating data leakage.",
     application:
       "Financial credit card fraud engines evaluate 100M daily transactions. They use class_weight='balanced_subsample' combined with threshold calibration to detect rare fraud with 85%+ recall while keeping false decline rates below 0.5%.",
     mistakes: [

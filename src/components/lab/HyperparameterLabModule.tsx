@@ -60,21 +60,22 @@ const hyperparameters: HyperparameterDef[] = [
     acceptedTypes: "int",
     validRange: "[1, ∞), typically 100 – 500",
     summary: "The number of decision trees constructed in the ensemble forest.",
-    mechanism: "Each tree is trained on an independently drawn bootstrap sample. Predictions are aggregated via plurality vote (classification) or arithmetic mean (regression). Adding more trees does NOT cause overfitting; it steadily drives ensemble variance down toward its theoretical correlation floor.",
+    mechanism: "Each tree is trained on an independently drawn bootstrap sample. Predictions are aggregated via plurality vote (classification) or arithmetic mean (regression). By Breiman's Strong Law of Large Numbers, the ensemble generalization error converges to a finite limiting bound as B → ∞. Adding more trees does NOT cause overfitting. However, on finite empirical datasets, validation score does not necessarily improve monotonically with every single tree added; small stochastic fluctuations occur before reaching an asymptotic performance plateau where marginal gains become negligible.",
     formula: "\\operatorname{Var}(\\bar{f}) = \\rho \\sigma^2 + \\frac{1 - \\rho}{B} \\sigma^2 \\xrightarrow{B \\to \\infty} \\rho \\sigma^2",
-    formulaExplanation: "As B (n_estimators) grows, the second term vanishes, leaving only the irreducible correlation floor.",
+    formulaExplanation: "As B (n_estimators) grows, the finite-sample variance term vanishes, leaving the irreducible tree-correlation floor ρσ².",
     impactBias: "Neutral",
     impactVariance: "Decreases",
     impactOverfit: "Decreases risk",
     impactTime: "Increases",
     impactMemory: "Increases",
-    tuningRecommendation: "Increase until out-of-bag (OOB) or validation score plateaus. Typical sweet spot is 200–400. Increasing beyond 500 yields diminishing returns at steep compute cost.",
+    tuningRecommendation: "Increase until out-of-bag (OOB) or cross-validation score flattens out into an asymptote. Typical sweet spot is 200–400 trees. Expect minor non-monotonic fluctuations across intermediate increments due to sample variance.",
     codeSnippet: `from sklearn.ensemble import RandomForestClassifier
 
-# 300 trees provide sufficient variance reduction without latency waste
+# 300 trees provide asymptotic variance reduction without excess inference latency
 rf = RandomForestClassifier(n_estimators=300, random_state=42, n_jobs=-1)`,
     commonMistakes: [
       "Tuning n_estimators aggressively in grid search (it doesn't have an 'overfitting peak'; set it to 200–300 and tune structural tree parameters instead).",
+      "Assuming test accuracy must strictly increase monotonically with every tree added (finite validation sets exhibit minor sampling variance).",
       "Using n_estimators=10 for production due to impatience, which leaves high residual variance.",
     ],
   },
@@ -82,26 +83,29 @@ rf = RandomForestClassifier(n_estimators=300, random_state=42, n_jobs=-1)`,
     id: "criterion",
     name: "criterion",
     category: "Tree Structure",
-    defaultVal: "'gini'",
+    defaultVal: "'gini' (Classifier) / 'squared_error' (Regressor)",
     acceptedTypes: "str",
-    validRange: "'gini', 'entropy', 'log_loss'",
+    validRange: "Classifier: 'gini', 'entropy', 'log_loss'; Regressor: 'squared_error', 'absolute_error', 'friedman_mse', 'poisson'",
     summary: "The mathematical metric used to evaluate candidate split quality at each node.",
-    mechanism: "Measures node impurity. Gini computes the probability of misclassifying a randomly chosen element if labeled according to the empirical distribution. Entropy and log_loss measure Shannon information gain in bits. Gini is computationally faster (no logarithms) and produces near-identical splits in 95%+ of cases.",
-    formula: "\\operatorname{Gini} = 1 - \\sum_{k=1}^K p_k^2, \\qquad H = -\\sum_{k=1}^K p_k \\log_2(p_k)",
-    formulaExplanation: "Gini peaks at 0.5 for binary splits; Entropy peaks at 1.0 bit. Both equal 0 for completely pure nodes.",
+    mechanism: "Measures node impurity or dispersion. For Classification: Gini computes the probability of incorrect labeling under random assignment; Entropy and log_loss measure Shannon information gain in bits. For Regression: 'squared_error' minimizes variance (L2 loss around node mean); 'absolute_error' minimizes L1 deviance around node median (robust to outliers); 'friedman_mse' applies Friedman's directional acceleration; 'poisson' optimizes Poisson deviance for non-negative count data.",
+    formula: "\\operatorname{Gini} = 1 - \\sum_{k=1}^K p_k^2, \\quad H = -\\sum_{k=1}^K p_k \\log_2(p_k), \\quad \\text{MSE} = \\frac{1}{N_t}\\sum_{i \\in t} (y_i - \\bar{y}_t)^2",
+    formulaExplanation: "Gini is computationally faster (no transcendental log calculations) and produces near-identical splits to entropy in >95% of cases.",
     impactBias: "Neutral",
     impactVariance: "Neutral",
     impactOverfit: "Neutral",
-    impactTime: "Increases",
+    impactTime: "Increases ('absolute_error' is O(N log N) per split)",
     impactMemory: "Neutral",
-    tuningRecommendation: "Keep default 'gini' for 98% of tabular applications. Test 'entropy' only if working on text or information-theoretic feature spaces where logarithmically scaled penalties are desired.",
-    codeSnippet: `from sklearn.ensemble import RandomForestClassifier
+    tuningRecommendation: "Classification: Keep default 'gini' for 98% of applications. Regression: Use 'squared_error' by default, or 'absolute_error' when the target contains extreme outliers.",
+    codeSnippet: `from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
-# 'gini' (fastest) vs 'entropy'/'log_loss' (information gain)
-rf_gini = RandomForestClassifier(criterion='gini', random_state=42)
-rf_entropy = RandomForestClassifier(criterion='entropy', random_state=42)`,
+# Classification: 'gini' (fastest) vs 'entropy'/'log_loss'
+rf_clf = RandomForestClassifier(criterion='gini', random_state=42)
+
+# Regression: 'squared_error' (L2 mean) vs 'absolute_error' (L1 median, outlier-resistant)
+rf_reg = RandomForestRegressor(criterion='squared_error', random_state=42)`,
     commonMistakes: [
       "Assuming 'entropy' will dramatically boost accuracy (Gini and entropy yield >98% identical decision trees in empirical studies).",
+      "Using criterion='absolute_error' on massive datasets without realizing it requires sorting samples at every node split, slowing training significantly.",
       "Confusing criterion='log_loss' with model evaluation log loss metric.",
     ],
   },
@@ -197,7 +201,7 @@ rf_leaf = RandomForestClassifier(min_samples_leaf=4, random_state=42)`,
     impactOverfit: "Decreases risk",
     impactTime: "Decreases",
     impactMemory: "Neutral",
-    tuningRecommendation: "Default 'sqrt' is optimal for most classification problems. For high-dimensional sparse data (genomics/NLP), test 0.2 to 0.5 of features.",
+    tuningRecommendation: "While Breiman's default heuristic 'sqrt' (m = floor(sqrt(p))) is a robust starting point, it is NOT mathematically optimal for every classification problem. On tabular datasets with sparse informative signals or high noise, larger subsets (e.g. 0.25p–0.50p) or 'log2' often achieve higher ROC-AUC. In regression, Scikit-Learn defaults to 1.0 (all features), though p/3 is Breiman's classic recommendation. Always treat max_features as a primary cross-validation tuning parameter.",
     codeSnippet: `from sklearn.ensemble import RandomForestClassifier
 
 # 'sqrt' is default for classification; float evaluates a proportion (e.g. 30%)
@@ -339,9 +343,9 @@ print(f"OOB Accuracy: {rf.oob_score_:.4f}")`,
     category: "Compute & System",
     defaultVal: "None",
     acceptedTypes: "int or None",
-    validRange: "None, 1, int > 0, -1, -2",
+    validRange: "None, 1, positive int (e.g. 4), -1, -2",
     summary: "The number of CPU worker processes to run in parallel for fitting and predicting.",
-    mechanism: "Random Forest trees are embarrassingly parallel. Scikit-learn uses joblib with the loky multiprocessing backend to spawn worker processes, distributing tree construction across CPU cores. n_jobs=-1 uses all available logical processors.",
+    mechanism: "Controls parallelization via the joblib loky multiprocessing backend: (1) n_jobs=None: Defaults to 1 CPU core unless invoked inside an active joblib.parallel_backend context; (2) n_jobs=1: Strictly sequential execution on the main process with zero inter-process communication (IPC) or serialization overhead; (3) positive int K: Spawns exactly K worker processes; (4) n_jobs=-1: Utilizes all logical CPU cores/threads reported by the operating system; (5) n_jobs=-2: Utilizes all cores except 1, keeping the system responsive for interactive UI tasks.",
     formula: "\\text{Speedup} \\le \\frac{1}{(1 - P) + \\frac{P}{N_{\\text{cores}}}} \\quad (\\text{Amdahl's Law})",
     formulaExplanation: "Parallel speedup is bounded by inter-process serialization overhead and memory bandwidth.",
     impactBias: "Neutral",
@@ -496,9 +500,9 @@ rf_verbose = RandomForestClassifier(n_estimators=500, verbose=1, random_state=42
     category: "Constraints & Weights",
     defaultVal: "None",
     acceptedTypes: "array-like of int, or None",
-    validRange: "Vector of length p with values -1, 0, or 1",
-    summary: "Enforces monotonic directional constraints (+1 increasing, -1 decreasing, 0 none) on features.",
-    mechanism: "Ensures that as a constrained feature increases, predicted probability never decreases (+1) or never increases (-1). Tree split thresholds that violate monotonicity during candidate search are discarded.",
+    validRange: "Vector or dict of length p with values +1, -1, or 0 (None default)",
+    summary: "Enforces monotonic directional constraints (+1 increasing, -1 decreasing, 0 unconstrained) on selected features.",
+    mechanism: "Introduced in Scikit-Learn 1.4+. Enforces that tree predictions are a monotonic function of specified features. A constraint of +1 requires non-decreasing predictions; -1 requires non-increasing; 0 leaves the feature unconstrained. During candidate split search, candidate splits that violate monotonicity are discarded. Crucially, Scikit-Learn restricts monotonic_cst strictly to binary classification (RandomForestClassifier) and regression (RandomForestRegressor); multiclass classification is explicitly unsupported and raises a ValueError.",
     formula: "x_{ij} \\le x_{kj} \\implies \\hat{P}(y=1 \\mid x_i) \\le \\hat{P}(y=1 \\mid x_k) \\quad (\\text{for } c_j = +1)",
     formulaExplanation: "Guarantees monotonic domain relationships (e.g. higher income should not lower credit approval probability).",
     impactBias: "Increases (restricts hypothesis space)",
@@ -512,7 +516,8 @@ rf_verbose = RandomForestClassifier(n_estimators=500, verbose=1, random_state=42
 # Enforce monotonic increase on feature 0, monotonic decrease on feature 1, unconstrained on feature 2
 rf_mono = RandomForestClassifier(monotonic_cst=[1, -1, 0], random_state=42)`,
     commonMistakes: [
-      "Attempting to use monotonic_cst on multiclass classification (currently supported only for binary classification and regression).",
+      "Attempting to use monotonic_cst on multiclass classification (strictly restricted to binary classification and regression in Scikit-Learn; raises a ValueError).",
+      "Using monotonic_cst on Scikit-Learn versions prior to 1.4 where the parameter is not supported.",
       "Treating monotonic constraints as proof of causality (it enforces monotonic predictive behavior, not causal mechanisms).",
     ],
   },

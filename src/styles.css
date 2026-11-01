@@ -178,3 +178,48 @@
 
 @keyframes dash { to { stroke-dashoffset: -20; } }
 @utility animate-dash { animation: dash 1.5s linear infinite; }
+
+/* -------------------------------------------------------------------------- */
+/* KATEX MATHEMATICAL TYPOGRAPHY & RESPONSIVE LAYOUT                          */
+/* -------------------------------------------------------------------------- */
+@layer base {
+  .katex {
+    font-size: 1.05em;
+    text-rendering: optimizeLegibility;
+    color: var(--color-foreground);
+  }
+
+  .katex-display {
+    margin: 1.25rem 0 !important;
+    padding: 0.5rem 0.25rem !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .katex-display > .katex {
+    font-size: 1.15em;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  /* Prevent clipping of subscripts, superscripts, and fractions */
+  .katex .vlist-t {
+    border-collapse: separate;
+  }
+
+  .katex .vlist-r {
+    line-height: normal;
+  }
+
+  .katex .frac-line {
+    border-bottom-width: 1.5px !important;
+    border-color: var(--color-foreground) !important;
+  }
+
+  .katex-html {
+    overflow-x: visible;
+  }
+}

@@ -42,4 +42,25 @@ describe("ImbalancedLabModule Tabs Render Test", () => {
     fireEvent.click(leakTab);
     expect(screen.getByText("Data Leakage Prevention & Method Selection Guide")).toBeDefined();
   });
+
+  it("clicks Balanced Random Forest tab and renders without error", () => {
+    render(<ImbalancedLabModule />);
+    const brfTab = screen.getByText("Balanced Random Forest");
+    fireEvent.click(brfTab);
+    expect(screen.getByText("The Per-Tree Bootstrap Mechanism")).toBeDefined();
+  });
+
+  it("clicks Advanced Samplers & Cleaning tab and renders without error", () => {
+    render(<ImbalancedLabModule />);
+    const advTab = screen.getByText("Advanced Samplers & Cleaning");
+    fireEvent.click(advTab);
+    expect(screen.getByText("ADASYN (Adaptive Synthetic Sampling)")).toBeDefined();
+  });
+
+  it("clicks Metrics & Threshold Optimization tab and interacts with threshold simulator", () => {
+    render(<ImbalancedLabModule />);
+    const metTab = screen.getByText("Metrics & Threshold Optimization");
+    fireEvent.click(metTab);
+    expect(screen.getByText("Bayes Optimal Decision Threshold & Cost Tuning")).toBeDefined();
+  });
 });

@@ -3,7 +3,25 @@ import { useState, type ReactNode } from "react";
 import { Check, ChevronRight, Clock, Copy, Info, Lightbulb, AlertTriangle, ArrowRight, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Difficulty, Formula } from "@/content/lessons";
-import { MathView } from "./MathView";
+import {
+  MathView,
+  InlineMath,
+  DisplayMath,
+  EquationBlock,
+  EquationExplanation,
+  VariableDefinitions,
+  DerivationStep,
+} from "./MathView";
+
+export {
+  MathView,
+  InlineMath,
+  DisplayMath,
+  EquationBlock,
+  EquationExplanation,
+  VariableDefinitions,
+  DerivationStep,
+};
 
 /* ---------- Badges ---------- */
 export function Eyebrow({ children }: { children: ReactNode }) {
@@ -92,15 +110,19 @@ export function PageHeader({ crumbs, eyebrow, title, intro, children }: {
 /* ---------- Math ---------- */
 export function MathPanel({ formula, className }: { formula: Formula; className?: string }) {
   return (
-    <div className={cn("relative overflow-hidden rounded-xl border border-border bg-secondary/50", className)}>
-      <div className="flex items-center justify-between border-b border-border px-4 py-2">
-        <span className="text-xs font-medium text-muted-foreground">{formula.label}</span>
-        <span className="font-mono text-[10px] text-primary">∑ FORMULA</span>
+    <div className={cn("relative overflow-hidden rounded-xl border border-border bg-card shadow-xs transition-colors hover:border-border/80", className)}>
+      <div className="flex items-center justify-between border-b border-border bg-secondary/40 px-4 py-2.5">
+        <span className="text-xs font-semibold text-foreground tracking-tight">{formula.label}</span>
+        <span className="font-mono text-[10px] text-primary bg-primary/10 border border-primary/20 rounded px-1.5 py-0.5">∑ FORMULA</span>
       </div>
-      <div className="bg-grid px-4 py-5 text-center overflow-x-auto">
-        <MathView math={formula.expr} display />
+      <div className="bg-grid/60 px-4 py-5 text-center overflow-x-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+        <MathView math={formula.expr} display className="text-base my-0 py-0" />
       </div>
-      {formula.note && <div className="border-t border-border px-4 py-2 text-xs text-muted-foreground">{formula.note}</div>}
+      {formula.note && (
+        <div className="border-t border-border bg-secondary/20 px-4 py-2.5 text-xs text-muted-foreground leading-relaxed">
+          {formula.note}
+        </div>
+      )}
     </div>
   );
 }
