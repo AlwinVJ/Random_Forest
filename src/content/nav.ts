@@ -1,7 +1,7 @@
 import {
   Home, Map, Layers, GitBranch, Trees, Shuffle, Boxes, Tags, TrendingUp, Scale,
   SlidersHorizontal, FlaskRound, BarChart3, ScaleIcon, Settings2, Sigma, Code2,
-  ClipboardList, LineChart, GitCompare, Globe, FlaskConical, GraduationCap,
+  ClipboardList, LineChart, GitCompare, Globe, FlaskConical, GraduationCap, Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -37,6 +37,8 @@ export const navGroups: NavGroup[] = [
     { title: "Out-of-Bag Estimation", to: "/oob-estimation", icon: FlaskRound },
     { title: "Feature Importance", to: "/feature-importance", icon: BarChart3 },
     { title: "Imbalanced Data", to: "/imbalanced-data", icon: ScaleIcon },
+    { title: "Class Weighting", to: "/class-weighting", icon: Scale },
+    { title: "SMOTE", to: "/smote", icon: Sparkles },
     { title: "Hyperparameter Optimization", to: "/hyperparameter-optimization", icon: Settings2 },
     { title: "Advanced Techniques", to: "/advanced-techniques", icon: Layers },
     { title: "Mathematical Deep Dive", to: "/mathematical-deep-dive", icon: Sigma },

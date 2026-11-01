@@ -17,6 +17,7 @@ import { Route as AssessmentRouteImport } from './routes/assessment'
 import { Route as BaggingRouteImport } from './routes/bagging'
 import { Route as BiasVarianceRouteImport } from './routes/bias-variance'
 import { Route as BootstrapSamplingRouteImport } from './routes/bootstrap-sampling'
+import { Route as ClassWeightingRouteImport } from './routes/class-weighting'
 import { Route as ClassificationRouteImport } from './routes/classification'
 import { Route as ClassificationProjectRouteImport } from './routes/classification-project'
 import { Route as DecisionTreesRouteImport } from './routes/decision-trees'
@@ -33,6 +34,7 @@ import { Route as RandomForestRouteImport } from './routes/random-forest'
 import { Route as RegressionRouteImport } from './routes/regression'
 import { Route as RegressionProjectRouteImport } from './routes/regression-project'
 import { Route as RoadmapRouteImport } from './routes/roadmap'
+import { Route as SmoteRouteImport } from './routes/smote'
 import { Route as PlaygroundIndexRouteImport } from './routes/playground.index'
 import { Route as PlaygroundLabRouteImport } from './routes/playground.$lab'
 
@@ -74,6 +76,11 @@ const BiasVarianceRoute = BiasVarianceRouteImport.update({
 const BootstrapSamplingRoute = BootstrapSamplingRouteImport.update({
   id: '/bootstrap-sampling',
   path: '/bootstrap-sampling',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClassWeightingRoute = ClassWeightingRouteImport.update({
+  id: '/class-weighting',
+  path: '/class-weighting',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ClassificationRoute = ClassificationRouteImport.update({
@@ -157,6 +164,11 @@ const RoadmapRoute = RoadmapRouteImport.update({
   path: '/roadmap',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SmoteRoute = SmoteRouteImport.update({
+  id: '/smote',
+  path: '/smote',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlaygroundIndexRoute = PlaygroundIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -177,6 +189,7 @@ export interface FileRoutesByFullPath {
   '/bagging': typeof BaggingRoute
   '/bias-variance': typeof BiasVarianceRoute
   '/bootstrap-sampling': typeof BootstrapSamplingRoute
+  '/class-weighting': typeof ClassWeightingRoute
   '/classification': typeof ClassificationRoute
   '/classification-project': typeof ClassificationProjectRoute
   '/decision-trees': typeof DecisionTreesRoute
@@ -193,6 +206,7 @@ export interface FileRoutesByFullPath {
   '/regression': typeof RegressionRoute
   '/regression-project': typeof RegressionProjectRoute
   '/roadmap': typeof RoadmapRoute
+  '/smote': typeof SmoteRoute
   '/playground/$lab': typeof PlaygroundLabRoute
   '/playground/': typeof PlaygroundIndexRoute
 }
@@ -205,6 +219,7 @@ export interface FileRoutesByTo {
   '/bagging': typeof BaggingRoute
   '/bias-variance': typeof BiasVarianceRoute
   '/bootstrap-sampling': typeof BootstrapSamplingRoute
+  '/class-weighting': typeof ClassWeightingRoute
   '/classification': typeof ClassificationRoute
   '/classification-project': typeof ClassificationProjectRoute
   '/decision-trees': typeof DecisionTreesRoute
@@ -220,6 +235,7 @@ export interface FileRoutesByTo {
   '/regression': typeof RegressionRoute
   '/regression-project': typeof RegressionProjectRoute
   '/roadmap': typeof RoadmapRoute
+  '/smote': typeof SmoteRoute
   '/playground/$lab': typeof PlaygroundLabRoute
   '/playground': typeof PlaygroundIndexRoute
 }
@@ -233,6 +249,7 @@ export interface FileRoutesById {
   '/bagging': typeof BaggingRoute
   '/bias-variance': typeof BiasVarianceRoute
   '/bootstrap-sampling': typeof BootstrapSamplingRoute
+  '/class-weighting': typeof ClassWeightingRoute
   '/classification': typeof ClassificationRoute
   '/classification-project': typeof ClassificationProjectRoute
   '/decision-trees': typeof DecisionTreesRoute
@@ -249,6 +266,7 @@ export interface FileRoutesById {
   '/regression': typeof RegressionRoute
   '/regression-project': typeof RegressionProjectRoute
   '/roadmap': typeof RoadmapRoute
+  '/smote': typeof SmoteRoute
   '/playground/$lab': typeof PlaygroundLabRoute
   '/playground/': typeof PlaygroundIndexRoute
 }
@@ -263,6 +281,7 @@ export interface FileRouteTypes {
     | '/bagging'
     | '/bias-variance'
     | '/bootstrap-sampling'
+    | '/class-weighting'
     | '/classification'
     | '/classification-project'
     | '/decision-trees'
@@ -279,6 +298,7 @@ export interface FileRouteTypes {
     | '/regression'
     | '/regression-project'
     | '/roadmap'
+    | '/smote'
     | '/playground/$lab'
     | '/playground/'
   fileRoutesByTo: FileRoutesByTo
@@ -291,6 +311,7 @@ export interface FileRouteTypes {
     | '/bagging'
     | '/bias-variance'
     | '/bootstrap-sampling'
+    | '/class-weighting'
     | '/classification'
     | '/classification-project'
     | '/decision-trees'
@@ -306,6 +327,7 @@ export interface FileRouteTypes {
     | '/regression'
     | '/regression-project'
     | '/roadmap'
+    | '/smote'
     | '/playground/$lab'
     | '/playground'
   id:
@@ -318,6 +340,7 @@ export interface FileRouteTypes {
     | '/bagging'
     | '/bias-variance'
     | '/bootstrap-sampling'
+    | '/class-weighting'
     | '/classification'
     | '/classification-project'
     | '/decision-trees'
@@ -334,6 +357,7 @@ export interface FileRouteTypes {
     | '/regression'
     | '/regression-project'
     | '/roadmap'
+    | '/smote'
     | '/playground/$lab'
     | '/playground/'
   fileRoutesById: FileRoutesById
@@ -347,6 +371,7 @@ export interface RootRouteChildren {
   BaggingRoute: typeof BaggingRoute
   BiasVarianceRoute: typeof BiasVarianceRoute
   BootstrapSamplingRoute: typeof BootstrapSamplingRoute
+  ClassWeightingRoute: typeof ClassWeightingRoute
   ClassificationRoute: typeof ClassificationRoute
   ClassificationProjectRoute: typeof ClassificationProjectRoute
   DecisionTreesRoute: typeof DecisionTreesRoute
@@ -363,6 +388,7 @@ export interface RootRouteChildren {
   RegressionRoute: typeof RegressionRoute
   RegressionProjectRoute: typeof RegressionProjectRoute
   RoadmapRoute: typeof RoadmapRoute
+  SmoteRoute: typeof SmoteRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -421,6 +447,13 @@ declare module '@tanstack/react-router' {
       path: '/bootstrap-sampling'
       fullPath: '/bootstrap-sampling'
       preLoaderRoute: typeof BootstrapSamplingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/class-weighting': {
+      id: '/class-weighting'
+      path: '/class-weighting'
+      fullPath: '/class-weighting'
+      preLoaderRoute: typeof ClassWeightingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/classification': {
@@ -535,6 +568,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RoadmapRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/smote': {
+      id: '/smote'
+      path: '/smote'
+      fullPath: '/smote'
+      preLoaderRoute: typeof SmoteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/playground/': {
       id: '/playground/'
       path: '/'
@@ -575,6 +615,7 @@ const rootRouteChildren: RootRouteChildren = {
   BaggingRoute: BaggingRoute,
   BiasVarianceRoute: BiasVarianceRoute,
   BootstrapSamplingRoute: BootstrapSamplingRoute,
+  ClassWeightingRoute: ClassWeightingRoute,
   ClassificationRoute: ClassificationRoute,
   ClassificationProjectRoute: ClassificationProjectRoute,
   DecisionTreesRoute: DecisionTreesRoute,
@@ -591,6 +632,7 @@ const rootRouteChildren: RootRouteChildren = {
   RegressionRoute: RegressionRoute,
   RegressionProjectRoute: RegressionProjectRoute,
   RoadmapRoute: RoadmapRoute,
+  SmoteRoute: SmoteRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -235,6 +235,76 @@ export function LessonVisual({ slug, className }: LessonVisualProps) {
         </div>
       );
 
+    case "imbalanced-data":
+    case "class-weighting":
+    case "smote":
+      return (
+        <div className={cn("surface relative overflow-hidden p-6", className)}>
+          <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground font-mono">
+            <span>smote_and_borderline_interpolation.svg</span>
+            <span className="text-primary">SMOTE & Borderline Boundary Partition</span>
+          </div>
+          <svg viewBox="0 0 600 260" className="w-full h-auto bg-grid rounded-xl">
+            {/* Background Zones for Borderline-SMOTE */}
+            <rect x="20" y="20" width="220" height="220" rx="12" fill="color-mix(in oklab, var(--destructive) 8%, transparent)" stroke="var(--destructive)" strokeDasharray="3 3" />
+            <text x="35" y="42" fill="var(--destructive)" fontSize="10" fontWeight="bold">Majority Territory (Class 0: 95%)</text>
+
+            <rect x="250" y="20" width="160" height="220" rx="12" fill="color-mix(in oklab, var(--warning) 10%, transparent)" stroke="var(--warning)" strokeDasharray="3 3" />
+            <text x="260" y="42" fill="var(--warning)" fontSize="10" fontWeight="bold">DANGER Zone (Borderline)</text>
+            <text x="260" y="56" fill="var(--muted-foreground)" fontSize="8">SMOTE synthesizes here</text>
+
+            <rect x="420" y="20" width="160" height="220" rx="12" fill="color-mix(in oklab, var(--success) 8%, transparent)" stroke="var(--success)" strokeDasharray="3 3" />
+            <text x="435" y="42" fill="var(--success)" fontSize="10" fontWeight="bold">SAFE Zone (Minority Core)</text>
+
+            {/* Majority Samples (Class 0) */}
+            {[
+              [50, 70], [90, 110], [60, 150], [130, 80], [110, 180], [170, 130],
+              [70, 210], [140, 220], [190, 70], [210, 170], [270, 80], [260, 190],
+              [290, 130]
+            ].map(([cx, cy], i) => (
+              <circle key={`maj-${i}`} cx={cx} cy={cy} r="5" fill="var(--muted-foreground)" opacity="0.6" />
+            ))}
+
+            {/* Safe Minority Samples */}
+            {[
+              [460, 80], [490, 120], [530, 90], [470, 170], [520, 180], [550, 140]
+            ].map(([cx, cy], i) => (
+              <circle key={`safe-${i}`} cx={cx} cy={cy} r="6" fill="var(--accent)" />
+            ))}
+
+            {/* Danger Minority Samples with SMOTE Interpolation */}
+            {/* Seed minority sample x_i */}
+            <circle cx="310" cy="170" r="7" fill="var(--primary)" stroke="var(--foreground)" strokeWidth="1.5" />
+            <text x="310" y="195" textAnchor="middle" fill="var(--foreground)" fontSize="10" fontWeight="bold">x_i (Seed)</text>
+
+            {/* Nearest Neighbor minority sample x_zi */}
+            <circle cx="360" cy="95" r="7" fill="var(--primary)" stroke="var(--foreground)" strokeWidth="1.5" />
+            <text x="360" y="85" textAnchor="middle" fill="var(--foreground)" fontSize="10" fontWeight="bold">x_zi (k-NN)</text>
+
+            {/* Interpolation Vector Segment */}
+            <line x1="310" y1="170" x2="360" y2="95" stroke="var(--primary)" strokeWidth="2" strokeDasharray="4 3" />
+
+            {/* Synthetic Sample x_new = x_i + λ*(x_zi - x_i) with λ = 0.55 */}
+            <g transform="translate(337.5, 128.75)">
+              <circle cx="0" cy="0" r="10" fill="color-mix(in oklab, var(--success) 35%, transparent)" stroke="var(--success)" strokeWidth="2" />
+              <circle cx="0" cy="0" r="5" fill="var(--success)" />
+              <text x="14" y="4" fill="var(--success)" fontSize="10" fontWeight="bold">x_new (λ = 0.55)</text>
+            </g>
+
+            {/* Mathematical annotation callout */}
+            <g transform="translate(190, 205)">
+              <rect width="220" height="36" rx="6" fill="var(--card)" stroke="var(--border)" />
+              <text x="110" y="16" textAnchor="middle" fill="var(--foreground)" fontSize="9" fontWeight="600">x_new = x_i + λ · (x_zi - x_i)</text>
+              <text x="110" y="28" textAnchor="middle" fill="var(--accent)" fontSize="8" fontFamily="var(--font-mono)">Linear convex segment interpolation</text>
+            </g>
+
+            {/* Isolated Noise minority sample */}
+            <circle cx="80" cy="90" r="5" fill="var(--destructive)" stroke="var(--destructive)" />
+            <text x="80" y="78" textAnchor="middle" fill="var(--destructive)" fontSize="8">NOISE (Pruned by Tomek/ENN)</text>
+          </svg>
+        </div>
+      );
+
     default:
       return (
         <div className={cn("surface relative overflow-hidden p-6", className)}>

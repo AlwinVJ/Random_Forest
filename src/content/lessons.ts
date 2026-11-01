@@ -1558,115 +1558,507 @@ print(f"Top Permutation Feature Index: {np.argmax(perm_importance.importances_me
     section: "Advanced Concepts",
     title: "Imbalanced Data Strategies",
     intro:
-      "Imbalanced classification occurs when target classes are unequally represented. In standard Random Forest, trees optimize overall accuracy, which causes them to overwhelmingly favor the majority class while ignoring critical rare minority events.",
+      "Imbalanced classification occurs when target classes are unequally represented. In standard Random Forest, trees optimize overall accuracy, causing them to favor the majority class while ignoring critical rare minority events. This comprehensive guide covers Class Weighting, Random Oversampling, Random Undersampling, SMOTE, and an end-to-end unified practical comparison.",
     whyNecessary:
-      "In high-stakes applications like credit card fraud (99.9% legitimate, 0.1% fraud) or rare cancer detection, a trivial model that predicts 'Legitimate' for every sample achieves 99.9% accuracy but is completely useless. Specialized strategies are required to force the forest to prioritize rare instances.",
+      "In critical domains like fraud detection (99% legitimate, 1% fraud), rare disease diagnostics, and cybersecurity intrusion detection, predicting the majority class for every sample achieves 99% raw accuracy but fails completely. Trees split nodes by maximizing overall impurity reduction, so splitting majority instances yields higher immediate gains unless class weights or resampling strategies force the forest to prioritize rare instances.",
     intuition:
-      "If a security guard is penalized $1 for a false alarm but $10,000 if an intruder slips past, the guard will scrutinize every faint sound. Adjusting class weights mimics this asymmetric penalty, forcing trees to prioritize minority detection.",
+      "Consider a bank transaction fraud monitor. If a false alarm costs $10 in customer verification while a missed fraud costs $5,000 in unrecoverable losses, a rational system must treat minority errors with 500x greater urgency. Class weighting embeds this asymmetric penalty directly into the loss function, while oversampling and undersampling physically rebalance the data manifold.",
     theory: [
-      "The Accuracy Paradox: Accuracy is completely uninformative under severe imbalance. Evaluation must rely on Precision, Recall, F1-Score, and Precision-Recall AUC (PR-AUC).",
-      "Cost-Sensitive Learning (class_weight='balanced'): Rescales Gini impurity and leaf voting by weights inversely proportional to class frequencies: w_c = N / (K · N_c).",
-      "Balanced Random Forest (Balanced Bootstrapping): Instead of standard bootstrap sampling of size N, each tree is trained on a bootstrap sample constructed by pairing all minority samples with a randomly downsampled equal number of majority samples.",
-      "Decision Threshold Tuning: Instead of using the default 0.5 probability cutoff, shifting the decision threshold to 0.2 or 0.1 significantly elevates minority recall.",
+      "The Accuracy Paradox: Raw accuracy is mathematically degenerate under severe class imbalance. A trivial majority classifier achieves 99% accuracy while exhibiting 0% minority recall. Evaluation must rely on Precision, Recall, F1-Score, Balanced Accuracy, Precision-Recall AUC (PR-AUC), and the Matthews Correlation Coefficient (MCC).",
+      "Technique 1 — Class Weighting (Cost-Sensitive Learning): Class weighting modifies the loss function by scaling the penalty of misclassifying sample i by weight w_{y_i}: L_weighted = sum_{i=1}^N w_{y_i} L(y_i, y_hat_i). In Random Forest, class weights rescale sample weights during Gini/Entropy impurity calculation at every candidate split. Four primary modes exist: (1) class_weight=None (all samples weighted equally), (2) class_weight='balanced' (weights inversely proportional to global class frequencies w_c = N / (K * N_c)), (3) class_weight='balanced_subsample' (weights recalculated dynamically within each tree's individual bootstrap replicate), and (4) custom dictionary weights (e.g., class_weight={0: 1, 1: 5}).",
+      "Technique 2 — Random Oversampling (ROS): Random Oversampling duplicates existing minority-class instances with replacement until class parity is reached. For example, a 900:100 dataset is transformed into 900:900 by duplicating minority observations 9 times. Advantage: simple and retains all original observations. Disadvantage: because exact identical feature vectors are duplicated, decision trees create narrow, memorized leaf partitions around duplicate points, substantially increasing the risk of overfitting.",
+      "Technique 3 — Random Undersampling (RUS): Random Undersampling randomly discards majority-class instances until classes are balanced. For example, a dataset with 10,000 majority and 200 minority samples is reduced to 200:200, discarding 9,800 majority observations. Advantage: drastically speeds up training and reduces memory usage. Disadvantage: catastrophic information loss—discarding 98% of majority data strips away critical boundary definitions and increases false alarm rates. Best used when dealing with massive datasets (>1M rows) where computational bandwidth is constrained.",
+      "Technique 4 — Synthetic Minority Over-sampling Technique (SMOTE): Rather than duplicating existing samples, SMOTE synthesizes novel minority observations along the line segment connecting random k-nearest minority neighbors in continuous feature space: x_new = x_i + lambda * (x_zi - x_i) with lambda ~ U(0,1). This expands the minority decision boundary continuously, overcoming the exact-duplication overfitting defect of Random Oversampling.",
+      "Data Leakage Integrity & Pipeline Enforcement: Resampling methods (SMOTE, ROS, RUS) MUST ONLY be applied to training data AFTER the train-test split. Resampling the test or validation set creates artificial test distributions and leaks information between partitions, rendering evaluation metrics invalid. Using imblearn.pipeline.Pipeline guarantees that resampling occurs strictly within training folds during cross-validation.",
+      "Unified Comparison Framework: Evaluating Baseline RF, Class Weighting (balanced and balanced_subsample), Random Oversampling, Random Undersampling, and SMOTE on the exact same dataset under identical hyperparameters reveals the fundamental precision-recall trade-off across techniques.",
     ],
-    readTime: "14 min",
+    readTime: "24 min",
     difficulty: "Advanced",
     formulas: [
       {
+        label: "Weighted Misclassification Loss Function",
+        expr: "L_{\\text{weighted}} = \\sum_{i=1}^{N} w_{y_i} L(y_i, \\hat{y}_i)",
+        note: "N: total samples; y_i: true label; y_hat_i: predicted label/probability; w_{y_i}: asymmetric weight scalar for class y_i; L: base loss.",
+      },
+      {
         label: "Balanced Class Weight Formula",
         expr: "w_c = \\frac{N}{K \\cdot N_c}",
-        note: "N is total samples, K is number of classes, N_c is count of samples in class c.",
+        note: "N: total training samples, K: number of classes (K=2 for binary), N_c: sample count in class c.",
       },
       {
-        label: "Precision and Recall",
-        expr: "\\text{Precision} = \\frac{\\text{TP}}{\\text{TP} + \\text{FP}}, \\qquad \\text{Recall} = \\frac{\\text{TP}}{\\text{TP} + \\text{FN}}",
-        note: "Recall measures detection rate of minority cases; Precision measures false alarm rate.",
+        label: "SMOTE Synthetic Vector Interpolation",
+        expr: "\\mathbf{x}_{\\text{new}} = \\mathbf{x}_i + \\lambda (\\mathbf{x}_{zi} - \\mathbf{x}_i), \\quad \\lambda \\sim \\mathcal{U}(0, 1)",
+        note: "x_i: seed minority sample; x_zi: randomly selected k-nearest minority neighbor; λ: uniform random interpolation scalar.",
       },
       {
-        label: "F1-Score (Harmonic Mean)",
-        expr: "F_1 = 2 \\cdot \\frac{\\text{Precision} \\cdot \\text{Recall}}{\\text{Precision} + \\text{Recall}}",
-        note: "Penalizes extreme imbalances between precision and recall.",
+        label: "Random Oversampling Class Expansion",
+        expr: "N_{\\text{min}}^{\\text{new}} = N_{\\text{maj}}, \\qquad N_{\\text{total}}^{\\text{new}} = 2 \\cdot N_{\\text{maj}}",
+        note: "Minority samples duplicated with replacement until class equality is established.",
+      },
+      {
+        label: "Random Undersampling Class Reduction",
+        expr: "N_{\\text{maj}}^{\\text{new}} = N_{\\text{min}}, \\qquad N_{\\text{total}}^{\\text{new}} = 2 \\cdot N_{\\text{min}}",
+        note: "Majority samples randomly dropped until class counts match minority; discarded = N_maj - N_min.",
+      },
+      {
+        label: "Matthews Correlation Coefficient (MCC)",
+        expr: "\\operatorname{MCC} = \\frac{\\text{TP} \\cdot \\text{TN} - \\text{FP} \\cdot \\text{FN}}{\\sqrt{(\\text{TP}+\\text{FP})(\\text{TP}+\\text{FN})(\\text{TN}+\\text{FP})(\\text{TN}+\\text{FN})}}",
+        note: "Ranges from -1 to +1; robust to severe imbalance where ROC-AUC gives overly optimistic scores.",
+      },
+      {
+        label: "Balanced Accuracy Score",
+        expr: "\\text{Balanced Acc} = \\frac{1}{2} \\left( \\frac{\\text{TP}}{\\text{TP} + \\text{FN}} + \\frac{\\text{TN}}{\\text{TN} + \\text{FP}} \\right)",
+        note: "Arithmetic mean of sensitivity (recall) and specificity; baseline random guessing yields 0.50.",
       },
     ],
-    workedExample: {
-      title: "Cost-Sensitive Loss Evaluation for 99:1 Fraud Detection",
-      problem:
-        "In a fraud dataset with 990 genuine and 10 fraudulent transactions, Model A predicts all genuine (99% accuracy). Model B flags 20 transactions, catching 9 frauds and 11 false alarms. Compare their Recall and F1 scores.",
+    derivation: {
+      title: "Derivations: Weighted Impurity and SMOTE Linear Convexity",
+      description:
+        "Mathematical derivation showing how class weights modify node split impurity and how SMOTE generates convex combinations in Euclidean space.",
       steps: [
         {
-          title: "Evaluate Model A (Trivial Majority Classifier)",
-          calculation: "\\text{TP}=0, \\; \\text{FN}=10 \\implies \\text{Recall} = \\frac{0}{10} = 0\\%, \\; F_1 = 0.0",
-          explanation: "Model A misses 100% of the frauds despite 99% accuracy!",
+          step: "Weighted Gini Impurity at Split Node",
+          math: "Gini_{\\text{weighted}}(t) = 1 - \\sum_{c=1}^K p_w(c \\mid t)^2, \\quad p_w(c \\mid t) = \\frac{\\sum_{i \\in t : y_i=c} w_c}{\\sum_{i \\in t} w_{y_i}}",
+          note: "Class weights directly modify the empirical class probabilities p_w(c|t) at tree node t, penalizing majority-dominated impure nodes.",
         },
         {
-          title: "Evaluate Model B Precision and Recall",
-          calculation: "\\text{Precision} = \\frac{9}{9 + 11} = 0.450 \\; (45\\%), \\quad \\text{Recall} = \\frac{9}{9 + 1} = 0.900 \\; (90\\%)",
-          explanation: "Model B successfully catches 90% of all fraudulent transactions.",
+          step: "SMOTE Convex Combination on Euclidean Line Segment",
+          math: "\\mathbf{x}_{\\text{new}}(\\lambda) = (1 - \\lambda) \\mathbf{x}_i + \\lambda \\mathbf{x}_{zi} = \\mathbf{x}_i + \\lambda (\\mathbf{x}_{zi} - \\mathbf{x}_i), \\quad \\lambda \\in [0, 1]",
+          note: "Because λ is drawn uniformly from [0, 1], x_new is guaranteed to lie on the straight line segment between x_i and x_zi, populating sparsely sampled minority regions without duplicating points.",
         },
         {
-          title: "Compute Model B F1 Score",
-          calculation: "F_1 = 2 \\times \\frac{0.45 \\times 0.90}{0.45 + 0.90} = 2 \\times \\frac{0.405}{1.35} = 0.600",
-          explanation: "F1 score reflects strong practical utility.",
+          step: "Matthews Correlation Coefficient (MCC) as Pearson Correlation",
+          math: "\\operatorname{MCC} = \\frac{\\operatorname{Cov}(Y, \\hat{Y})}{\\sigma_Y \\sigma_{\\hat{Y}}} = \\frac{\\sum (y_i - \\bar{y})(\\hat{y}_i - \\bar{\\hat{y}})}{\\sqrt{\\sum (y_i - \\bar{y})^2 \\sum (\\hat{y}_i - \\bar{\\hat{y}})^2}}",
+          note: "Treating binary ground truth Y and binary prediction Y_hat as Bernoulli random variables yields the exact contingency matrix formula for MCC.",
         },
       ],
-      result: "Model B has 0.60 F1 and 90% Recall vs 0.0 for Model A. Model B is vastly superior in production.",
+    },
+    workedExample: {
+      title: "Step-by-Step SMOTE Vector Generation in 2D Feature Space",
+      problem:
+        "A financial fraud dataset has 2 features: Transaction Amount x1 ($ x 10) and Transaction Velocity x2 (trans/hr). A seed fraudulent transaction is located at x_1 = [2.0, 3.5]. Three neighboring candidate fraud cases are x_2 = [3.0, 5.0], x_3 = [1.5, 4.0], and x_4 = [4.0, 2.0]. Using k = 2 nearest neighbors, compute Euclidean distances, select the second neighbor x_2, draw lambda = 0.40, and compute the exact synthetic sample coordinate x_new.",
+      steps: [
+        {
+          title: "Compute Euclidean distances from seed sample x_1 = [2.0, 3.5]",
+          calculation: "d(x_1, x_2) = \\sqrt{(3.0-2.0)^2 + (5.0-3.5)^2} = \\sqrt{1.0^2 + 1.5^2} = \\sqrt{3.25} \\approx 1.8028 \\\\ d(x_1, x_3) = \\sqrt{(1.5-2.0)^2 + (4.0-3.5)^2} = \\sqrt{(-0.5)^2 + 0.5^2} = \\sqrt{0.50} \\approx 0.7071 \\\\ d(x_1, x_4) = \\sqrt{(4.0-2.0)^2 + (2.0-3.5)^2} = \\sqrt{2.0^2 + (-1.5)^2} = \\sqrt{6.25} = 2.5000",
+          explanation: "Comparing Euclidean distances: d(x_1, x_3) = 0.707 < d(x_1, x_2) = 1.803 < d(x_1, x_4) = 2.500.",
+        },
+        {
+          title: "Identify k = 2 Nearest Neighbors and select x_zi",
+          calculation: "\\mathcal{N}_2(\\mathbf{x}_1) = \\{\\mathbf{x}_3, \\mathbf{x}_2\\}, \\quad \\text{Algorithm randomly selects } \\mathbf{x}_{zi} = \\mathbf{x}_2 = [3.0, 5.0]",
+          explanation: "Candidate pool consists of x_3 and x_2. SMOTE randomly samples x_2 for this interpolation step.",
+        },
+        {
+          title: "Compute Difference Vector",
+          calculation: "\\mathbf{v}_{\\text{diff}} = \\mathbf{x}_{zi} - \\mathbf{x}_1 = [3.0 - 2.0, \\; 5.0 - 3.5] = [1.0, \\; 1.5]",
+          explanation: "Direction vector from x_1 toward x_2.",
+        },
+        {
+          title: "Generate Synthetic Coordinate with lambda = 0.40",
+          calculation: "\\mathbf{x}_{\\text{new}} = [2.0, \\; 3.5] + 0.40 \\times [1.0, \\; 1.5] = [2.0 + 0.40, \\; 3.5 + 0.60] = [2.40, \\; 4.10]",
+          explanation: "Synthetic point x_new is positioned at (2.40, 4.10).",
+        },
+        {
+          title: "Verify Collinearity and Euclidean Distance Proportion",
+          calculation: "d(\\mathbf{x}_1, \\mathbf{x}_{\\text{new}}) = \\sqrt{(2.40-2.0)^2 + (4.10-3.5)^2} = \\sqrt{0.16 + 0.36} = \\sqrt{0.52} \\approx 0.7211 \\\\ \\lambda \\times d(\\mathbf{x}_1, \\mathbf{x}_2) = 0.40 \\times 1.8028 = 0.7211 \\quad (\\text{Exact match!})",
+          explanation: "x_new lies precisely 40% of the distance from x_1 to x_2 along the line segment.",
+        },
+      ],
+      result: "Synthetic instance x_new = [2.40, 4.10] successfully generated without copying existing points.",
     },
     rfConnection:
-      "Setting class_weight='balanced' or class_weight='balanced_subsample' (recomputed per tree bootstrap) directly alters split criteria to prioritize minority purity.",
-    code: `from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, average_precision_score
+      "Random Forest provides native support for imbalanced data via class_weight='balanced' and class_weight='balanced_subsample'. When paired with imbalanced-learn pipelines (RandomOverSampler, RandomUnderSampler, SMOTE), practitioners can balance minority sensitivity with computational efficiency while preventing data leakage.",
+    code: `import numpy as np
+import pandas as pd
 from sklearn.datasets import make_classification
-
-# Generate imbalanced dataset (98% Class 0, 2% Class 1)
-X, y = make_classification(n_samples=2000, weights=[0.98, 0.02], random_state=42)
-
-# Fit balanced random forest
-rf_imb = RandomForestClassifier(
-    n_estimators=150,
-    class_weight='balanced_subsample',  # Re-weight per bootstrap sample
-    random_state=42
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score,
+    f1_score, roc_auc_score, confusion_matrix
 )
-rf_imb.fit(X, y)
+from imblearn.over_sampling import RandomOverSampler, SMOTE
+from imblearn.under_sampling import RandomUnderSampler
+from imblearn.pipeline import Pipeline as ImbPipeline
 
-probs = rf_imb.predict_proba(X)[:, 1]
-print(f"PR-AUC Score: {average_precision_score(y, probs):.4f}")`,
+# 1. Generate imbalanced dataset (98% Majority Class 0, 2% Minority Class 1)
+X, y = make_classification(
+    n_samples=10000, n_features=20, n_informative=12,
+    weights=[0.98, 0.02], flip_y=0.01, random_state=42
+)
+
+# 2. Stratified train-test split (resampling strictly on train data to prevent leakage)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, stratify=y, random_state=42
+)
+
+# Common base Random Forest hyperparameters
+rf_kwargs = {'n_estimators': 200, 'max_depth': 12, 'random_state': 42, 'n_jobs': -1}
+
+# 3. Define the 6 comparison configurations
+pipelines = {
+    "Baseline (None)": RandomForestClassifier(**rf_kwargs, class_weight=None),
+    "Class Weight ('balanced')": RandomForestClassifier(**rf_kwargs, class_weight="balanced"),
+    "Class Weight ('balanced_subsample')": RandomForestClassifier(**rf_kwargs, class_weight="balanced_subsample"),
+    "Random Oversampling": ImbPipeline([('ros', RandomOverSampler(random_state=42)), ('rf', RandomForestClassifier(**rf_kwargs))]),
+    "Random Undersampling": ImbPipeline([('rus', RandomUnderSampler(random_state=42)), ('rf', RandomForestClassifier(**rf_kwargs))]),
+    "SMOTE": ImbPipeline([('smote', SMOTE(k_neighbors=5, random_state=42)), ('rf', RandomForestClassifier(**rf_kwargs))]),
+}
+
+# 4. Train, evaluate, and assemble comparison DataFrame
+benchmark_rows = []
+for name, model in pipelines.items():
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    y_prob = model.predict_proba(X_test)[:, 1]
+    
+    benchmark_rows.append({
+        "Technique": name,
+        "Accuracy": accuracy_score(y_test, y_pred),
+        "Precision": precision_score(y_test, y_pred, zero_division=0),
+        "Recall": recall_score(y_test, y_pred, zero_division=0),
+        "F1-score": f1_score(y_test, y_pred, zero_division=0),
+        "ROC-AUC": roc_auc_score(y_test, y_prob)
+    })
+
+df_comparison = pd.DataFrame(benchmark_rows)
+print(df_comparison.to_string(index=False))`,
     codeExplanation:
-      "class_weight='balanced_subsample' calculates weights based on each tree's individual bootstrap sample, adapting to local sampling fluctuations.",
+      "All 6 techniques are trained on the exact same stratified training split and evaluated on the untouched test partition. ImbPipeline encapsulates resampling so it executes strictly on training folds, eliminating data leakage.",
     application:
-      "Cybersecurity intrusion detection systems process billions of network packets daily, where malicious attacks constitute less than 0.01% of total traffic.",
+      "Financial credit card fraud engines evaluate 100M daily transactions. They use class_weight='balanced_subsample' combined with threshold calibration to detect rare fraud with 85%+ recall while keeping false decline rates below 0.5%.",
     mistakes: [
-      "Evaluating an imbalanced classifier using standard classification accuracy.",
-      "Oversampling the minority class before train-test splitting (causes catastrophic data leakage).",
-      "Using ROC-AUC instead of Precision-Recall AUC on datasets with extreme class ratios.",
+      "Evaluating imbalanced models using raw classification accuracy (e.g. 98% accuracy can have 0% minority recall).",
+      "Applying SMOTE, Random Oversampling, or Undersampling before train-test splitting (causes severe data leakage into validation/test sets).",
+      "Confusing class_weight='balanced' with class_weight='balanced_subsample' ('balanced' calculates weights globally, while 'balanced_subsample' recalculates per tree bootstrap).",
+      "Using Random Undersampling on small datasets (causes catastrophic loss of majority variance).",
+      "Assuming Random Oversampling solves class imbalance without risk (exact duplicates cause decision trees to memorize noise and overfit).",
     ],
     prosCons: {
       pros: [
-        "class_weight requires zero dataset modification or synthetic sample generation.",
-        "Maintains full minority class sensitivity without discarding majority data.",
+        "Class weighting requires zero synthetic data generation or memory overhead.",
+        "SMOTE creates smooth, continuous minority boundaries without duplicating samples.",
+        "Random Undersampling drastically speeds up training on massive multi-million row datasets.",
+        "imblearn.pipeline.Pipeline integrates seamlessly with Scikit-Learn cross-validation.",
       ],
       cons: [
-        "Can lead to an increase in false positive alarms.",
-        "Threshold tuning is required for optimal operational cost tradeoffs.",
+        "Random Oversampling can cause decision trees to overfit duplicate points.",
+        "Random Undersampling discards valuable majority data and variance.",
+        "Aggressive rebalancing lowers precision, requiring operational threshold tuning.",
       ],
     },
     takeaways: [
-      "Never rely on accuracy when evaluating imbalanced datasets; use Precision, Recall, F1, and PR-AUC.",
-      "class_weight='balanced_subsample' weights minority samples inversely proportional to their frequency.",
-      "Adjusting probability decision thresholds allows tuning the operational balance between false alarms and missed detections.",
+      "Never trust accuracy under severe class imbalance; prioritize Recall, F1-Score, PR-AUC, and MCC.",
+      "Class weighting adjusts the loss function: L_weighted = sum w_{y_i} L(y_i, y_hat_i), requiring no data manipulation.",
+      "class_weight='balanced_subsample' adapts weights dynamically inside each bootstrap sample.",
+      "Random Oversampling duplicates samples (overfitting hazard); SMOTE interpolates between neighbors.",
+      "Random Undersampling deletes majority samples (information loss hazard); optimal for massive datasets.",
+      "Always apply resampling strictly to training folds via imblearn.pipeline.Pipeline to prevent data leakage.",
     ],
     quiz: {
-      prompt: "On a dataset with 99.5% negative samples and 0.5% positive samples, which evaluation metric is most informative?",
+      prompt: "Why can Random Oversampling cause decision trees in a Random Forest to overfit more severely than SMOTE?",
       options: [
-        "Precision-Recall AUC (PR-AUC)",
-        "Raw classification accuracy",
-        "Mean Squared Error",
-        "Explained Variance Score",
+        "Random Oversampling creates exact identical duplicates of minority observations, encouraging trees to memorize narrow, noise-filled leaf partitions",
+        "Random Oversampling converts all continuous features into categorical features",
+        "Random Oversampling deletes majority samples from the training dataset",
+        "Random Oversampling disables bootstrap sampling across the forest",
       ],
       answerIndex: 0,
       explanation:
-        "On highly imbalanced datasets, raw accuracy is trivially high (99.5%) while missing all positive cases. PR-AUC focuses specifically on the minority positive class and does not get distorted by large true negative counts.",
+        "Because Random Oversampling duplicates exact existing samples, decision tree algorithms find it easy to isolate these duplicate data points into tiny, pure leaves. This memorizes training noise rather than learning generalizable boundary manifolds. In contrast, SMOTE generates new synthetic points along line segments, creating geometric diversity.",
     },
   },
+
+  "class-weighting": {
+    slug: "class-weighting",
+    module: "12A",
+    section: "Advanced Concepts",
+    title: "Class Weighting in Random Forest",
+    intro:
+      "Class weighting is a cost-sensitive learning technique that modifies the decision tree loss function by scaling the misclassification penalty according to sample class membership, forcing the ensemble to prioritize rare minority events without altering dataset size.",
+    whyNecessary:
+      "In standard decision trees, greedy split optimization treats every observation equally. On a dataset with 99% majority and 1% minority instances, splitting the majority class yields far greater impurity reduction than isolating minority instances, leading to models that miss critical rare events. Class weighting forces trees to balance split utility.",
+    intuition:
+      "Consider a security screener: letting an ordinary passenger pass costs $0, but letting contraband pass carries a catastrophic $100,000 penalty. A rational screener scrutinizes suspicious indicators with extreme attention. Class weighting translates this asymmetric risk profile into the model loss function.",
+    theory: [
+      "Cost-Sensitive Loss Modification: Class weighting directly rescales the loss incurred on observation i by a scalar weight w_{y_i}: L_weighted = sum_{i=1}^N w_{y_i} L(y_i, y_hat_i). Every term corresponds to: N (total samples), i (sample index), y_i (true label), y_hat_i (predicted probability), L (base loss), and w_{y_i} (class weight multiplier).",
+      "Gini Impurity Modification: During candidate split evaluation at tree node t, class weights rescale sample counts to compute weighted empirical class probabilities: p_w(c | t) = (sum_{i in t : y_i=c} w_c) / (sum_{i in t} w_{y_i}). This directly penalizes majority-dominated impure splits.",
+      "Scikit-Learn Mode 1 — None: Default setting where all samples carry equal weight (w_0 = w_1 = 1.0). Trees optimize raw accuracy, causing severe minority neglect.",
+      "Scikit-Learn Mode 2 — 'balanced': Automatically computes weights inversely proportional to global class frequencies: w_c = N / (K * N_c), where N is total samples, K is number of classes, and N_c is count of class c.",
+      "Scikit-Learn Mode 3 — 'balanced_subsample': Recomputes class weights dynamically within each individual tree's bootstrap sample: w_{c,b} = N_b / (K * N_{c,b}). This adapts to local bootstrap fluctuations and provides superior variance control.",
+      "Scikit-Learn Mode 4 — Custom Dictionary: Explicitly specifies asymmetric penalties, such as class_weight={0: 1, 1: 5}, defining a 5x penalty for false negatives compared to false positives.",
+    ],
+    readTime: "18 min",
+    difficulty: "Advanced",
+    formulas: [
+      {
+        label: "Weighted Misclassification Loss Function",
+        expr: "L_{\\text{weighted}} = \\sum_{i=1}^{N} w_{y_i} L(y_i, \\hat{y}_i)",
+        note: "w_{y_i} assigns an asymmetric loss penalty according to observation i's true class label.",
+      },
+      {
+        label: "Balanced Class Weight Formula",
+        expr: "w_c = \\frac{N}{K \\cdot N_c}",
+        note: "N: total training samples, K: number of classes (K=2 for binary), N_c: sample count in class c.",
+      },
+      {
+        label: "Dynamic Bootstrap Subsample Class Weight",
+        expr: "w_{c, b} = \\frac{N_b}{K \\cdot N_{c, b}}",
+        note: "Calculated per tree bootstrap draw b, where N_b and N_{c,b} are local bootstrap sample counts.",
+      },
+      {
+        label: "Weighted Node Class Proportion in Gini Split",
+        expr: "p_w(c \\mid t) = \\frac{\\sum_{i \\in t : y_i=c} w_c}{\\sum_{i \\in t} w_{y_i}}",
+        note: "Weighted empirical probability used in calculating Gini impurity at split node t.",
+      },
+    ],
+    derivation: {
+      title: "Derivation of Balanced Class Weights and Node Purity",
+      description:
+        "Mathematical proof showing how balanced class weights equalize the effective influence of majority and minority classes during Gini split evaluation.",
+      steps: [
+        {
+          step: "Total Weighted Sample Contribution by Class",
+          math: "W_c = \\sum_{i : y_i = c} w_c = N_c \\cdot w_c = N_c \\cdot \\left( \\frac{N}{K \\cdot N_c} \\right) = \\frac{N}{K}",
+          note: "Multiplying class count N_c by weight w_c produces exactly N/K for every class c in the dataset.",
+        },
+        {
+          step: "Equal Effective Influence on Node Purity",
+          math: "W_0 = \\frac{N}{2}, \\quad W_1 = \\frac{N}{2} \\implies \\sum_{i : y_i = 0} w_0 = \\sum_{j : y_j = 1} w_1",
+          note: "Both classes now exert identical total influence (50% each) on impurity reduction, removing majority bias.",
+        },
+      ],
+    },
+    workedExample: {
+      title: "Calculating Balanced Class Weights for a 950:50 Medical Dataset",
+      problem:
+        "A binary medical screening dataset has N = 1,000 total patients with K = 2 classes: 950 Healthy (Class 0) and 50 Diseased (Class 1). Calculate the exact class weights under class_weight='balanced', and compute the total weighted mass for both classes.",
+      steps: [
+        {
+          title: "Compute weight for Healthy Class 0 (N_0 = 950)",
+          calculation: "w_0 = \\frac{1000}{2 \\times 950} = \\frac{1000}{1900} \\approx 0.5263",
+          explanation: "Majority class weight is scaled down to ~0.53.",
+        },
+        {
+          title: "Compute weight for Diseased Class 1 (N_1 = 50)",
+          calculation: "w_1 = \\frac{1000}{2 \\times 50} = \\frac{1000}{100} = 10.000",
+          explanation: "Minority class weight is amplified 10-fold.",
+        },
+        {
+          title: "Verify Total Weighted Influence",
+          calculation: "W_0 = 950 \\times 0.5263 = 500, \\quad W_1 = 50 \\times 10.0 = 500",
+          explanation: "Both classes exert exactly 500 units of influence on tree split evaluations.",
+        },
+      ],
+      result: "Healthy weight = 0.526, Diseased weight = 10.0. Perfect empirical balance is achieved.",
+    },
+    rfConnection:
+      "Setting class_weight='balanced_subsample' in RandomForestClassifier adjusts both node split criteria and leaf probability estimation across all trees without generating synthetic data or consuming extra memory.",
+    code: `from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report
+from sklearn.model_selection import train_test_split
+from sklearn.datasets import make_classification
+
+X, y = make_classification(n_samples=5000, weights=[0.98, 0.02], random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, stratify=y, random_state=42)
+
+# Train with dynamic bootstrap subsample reweighting
+rf_weighted = RandomForestClassifier(
+    n_estimators=200,
+    max_depth=12,
+    class_weight='balanced_subsample',
+    random_state=42,
+    n_jobs=-1
+)
+rf_weighted.fit(X_train, y_train)
+
+y_pred = rf_weighted.predict(X_test)
+print(classification_report(y_test, y_pred, target_names=['Normal', 'Rare Event']))`,
+    codeExplanation:
+      "class_weight='balanced_subsample' recomputes weights independently within each tree's bootstrap replicate, adapting to local sample fluctuations.",
+    application:
+      "Semiconductor manufacturing fabs monitor wafer fabrication defects where fault rates are below 0.1%. Using balanced_subsample class weights catches 85% of defects without modifying production telemetry databases.",
+    mistakes: [
+      "Assuming class_weight modifies the dataset size (it only modifies loss and split criteria; dataset size is unchanged).",
+      "Using class_weight='balanced' instead of 'balanced_subsample' on small minority sample sizes (subsample weighting handles local sampling noise better).",
+      "Relying on raw classification accuracy to evaluate weighted models.",
+    ],
+    prosCons: {
+      pros: [
+        "Zero synthetic data generation or memory overhead.",
+        "Preserves exact original feature relationships and geometry.",
+        "Fastest imbalanced learning technique (no resampling steps).",
+      ],
+      cons: [
+        "Can increase false positive rate without threshold tuning.",
+        "Does not populate sparse regions of feature space like SMOTE.",
+      ],
+    },
+    takeaways: [
+      "Class weighting rescales the loss function: L_weighted = sum w_{y_i} L(y_i, y_hat_i).",
+      "class_weight='balanced_subsample' adapts weights per bootstrap draw for optimal variance reduction.",
+      "Custom class weights {0: 1, 1: 5} allow direct alignment with business cost matrices.",
+    ],
+    quiz: {
+      prompt: "What is the key advantage of class_weight='balanced_subsample' over class_weight='balanced'?",
+      options: [
+        "It recalculates class weights dynamically inside each tree's individual bootstrap sample, adapting to local sampling fluctuations",
+        "It generates synthetic minority samples using linear interpolation",
+        "It completely deletes the majority class from training",
+        "It forces all trees to have a maximum depth of 1",
+      ],
+      answerIndex: 0,
+      explanation:
+        "Because each tree in a Random Forest is trained on an independently drawn bootstrap sample, the local class proportions vary. class_weight='balanced_subsample' recomputes weights per tree to match each bootstrap draw's actual empirical ratio.",
+    },
+  },
+
+  "smote": {
+    slug: "smote",
+    module: "12B",
+    section: "Advanced Concepts",
+    title: "SMOTE (Synthetic Minority Over-sampling)",
+    intro:
+      "SMOTE (Synthetic Minority Over-sampling Technique) creates artificial minority instances by linear vector interpolation between k-nearest minority neighbors, populating the minority feature space without exact duplication.",
+    whyNecessary:
+      "Random Oversampling duplicates exact samples, causing decision trees to create narrow, memorized leaves that overfit noise. SMOTE synthesizes continuous diversity along the minority manifold, allowing the ensemble to learn broader, robust decision boundaries.",
+    intuition:
+      "If you only have two photos of an endangered bird flying left and right, Random Oversampling simply makes photocopies of both photos. SMOTE mathematically estimates what the bird looks like mid-turn, creating new valid perspectives.",
+    theory: [
+      "Linear Vector Interpolation: For a given minority instance x_i, SMOTE identifies its k-nearest neighbors in minority space, randomly selects one neighbor x_zi, and creates a synthetic instance: x_new = x_i + lambda * (x_zi - x_i) with lambda ~ U(0,1).",
+      "Overcoming Duplication Overfitting: Because synthetic instances occupy new coordinates on the line segment connecting real minority points, decision trees learn continuous boundaries instead of memorizing discrete duplicated points.",
+      "Failure Modes & Limitations: If minority samples are noisy outliers located deep inside majority territory, standard SMOTE can synthesize points bridging across classes. Advanced variants like Borderline-SMOTE, SMOTE-Tomek, and SMOTE-ENN mitigate this by cleaning boundaries.",
+      "Data Leakage Integrity: SMOTE MUST ONLY be applied to the training dataset after splitting. Applying SMOTE before splitting leaks information between folds and produces invalid, over-optimistic evaluation metrics. Use imblearn.pipeline.Pipeline to enforce strict cross-validation isolation.",
+    ],
+    readTime: "20 min",
+    difficulty: "Advanced",
+    formulas: [
+      {
+        label: "SMOTE Synthetic Vector Generation",
+        expr: "\\mathbf{x}_{\\text{new}} = \\mathbf{x}_i + \\lambda (\\mathbf{x}_{zi} - \\mathbf{x}_i), \\quad \\lambda \\sim \\mathcal{U}(0, 1)",
+        note: "x_i: seed minority sample; x_zi: randomly chosen neighbor from k-NN(x_i); λ: uniform random interpolation scalar.",
+      },
+      {
+        label: "Euclidean Feature Distance",
+        expr: "d(\\mathbf{x}_i, \\mathbf{x}_j) = \\sqrt{\\sum_{m=1}^{p} (x_{im} - x_{jm})^2}",
+        note: "Distance metric used to construct the k-nearest neighbor graph among minority instances.",
+      },
+      {
+        label: "Interpolation Distance Proportionality",
+        expr: "d(\\mathbf{x}_i, \\mathbf{x}_{\\text{new}}) = \\lambda \\cdot d(\\mathbf{x}_i, \\mathbf{x}_{zi})",
+        note: "Synthetic instance lies strictly along the segment at proportion λ from seed sample x_i.",
+      },
+    ],
+    derivation: {
+      title: "SMOTE Metric Space Convex Combination Derivation",
+      description:
+        "Mathematical derivation showing that SMOTE synthetic points are valid convex combinations guaranteed to lie on the line segment connecting real minority instances.",
+      steps: [
+        {
+          step: "Define Minority Feature Manifold and k-NN Graph",
+          math: "\\mathcal{D}_{\\text{min}} = \\{(\\mathbf{x}_i, y_i) \\in \\mathbb{R}^p \\times \\{1\\}\\}, \\quad \\mathcal{N}_k(\\mathbf{x}_i) = \\arg\\min_{S \\subset \\mathcal{D}_{\\text{min}} \\setminus \\{\\mathbf{x}_i\\}, |S|=k} \\sum_{\\mathbf{z} \\in S} \\|\\mathbf{x}_i - \\mathbf{z}\\|_2",
+          note: "Constructs the local neighborhood of candidate interpolation partners for seed sample x_i.",
+        },
+        {
+          step: "Convex Combination on Euclidean Line Segment",
+          math: "\\mathbf{x}_{\\text{new}}(\\lambda) = (1 - \\lambda) \\mathbf{x}_i + \\lambda \\mathbf{x}_{zi} = \\mathbf{x}_i + \\lambda (\\mathbf{x}_{zi} - \\mathbf{x}_i), \\quad \\lambda \\in [0, 1]",
+          note: "Because λ is drawn from [0, 1], x_new is a strictly convex combination of x_i and x_zi, populating the interior of the minority class convex hull.",
+        },
+      ],
+    },
+    workedExample: {
+      title: "Step-by-Step SMOTE Vector Generation in 2D Feature Space",
+      problem:
+        "A financial fraud dataset has 2 features: Transaction Amount x1 ($ x 10) and Transaction Velocity x2 (trans/hr). A seed fraudulent transaction is located at x_1 = [2.0, 3.5]. Three neighboring candidate fraud cases are x_2 = [3.0, 5.0], x_3 = [1.5, 4.0], and x_4 = [4.0, 2.0]. Using k = 2 nearest neighbors, compute Euclidean distances, select neighbor x_2, draw lambda = 0.40, and compute the synthetic sample coordinate x_new.",
+      steps: [
+        {
+          title: "Compute Euclidean distances from seed sample x_1 = [2.0, 3.5]",
+          calculation: "d(x_1, x_2) = \\sqrt{(3.0-2.0)^2 + (5.0-3.5)^2} = \\sqrt{1.0^2 + 1.5^2} = \\sqrt{3.25} \\approx 1.8028 \\\\ d(x_1, x_3) = \\sqrt{(1.5-2.0)^2 + (4.0-3.5)^2} = \\sqrt{(-0.5)^2 + 0.5^2} = \\sqrt{0.50} \\approx 0.7071 \\\\ d(x_1, x_4) = \\sqrt{(4.0-2.0)^2 + (2.0-3.5)^2} = \\sqrt{2.0^2 + (-1.5)^2} = \\sqrt{6.25} = 2.5000",
+          explanation: "Comparing Euclidean distances: d(x_1, x_3) = 0.707 < d(x_1, x_2) = 1.803 < d(x_1, x_4) = 2.500.",
+        },
+        {
+          title: "Identify k = 2 Nearest Neighbors and select x_zi",
+          calculation: "\\mathcal{N}_2(\\mathbf{x}_1) = \\{\\mathbf{x}_3, \\mathbf{x}_2\\}, \\quad \\text{Algorithm randomly selects } \\mathbf{x}_{zi} = \\mathbf{x}_2 = [3.0, 5.0]",
+          explanation: "Candidate pool consists of x_3 and x_2. SMOTE randomly samples x_2 for this interpolation step.",
+        },
+        {
+          title: "Compute Difference Vector",
+          calculation: "\\mathbf{v}_{\\text{diff}} = \\mathbf{x}_{zi} - \\mathbf{x}_1 = [3.0 - 2.0, \\; 5.0 - 3.5] = [1.0, \\; 1.5]",
+          explanation: "Direction vector from x_1 toward x_2.",
+        },
+        {
+          title: "Generate Synthetic Coordinate with lambda = 0.40",
+          calculation: "\\mathbf{x}_{\\text{new}} = [2.0, \\; 3.5] + 0.40 \\times [1.0, \\; 1.5] = [2.0 + 0.40, \\; 3.5 + 0.60] = [2.40, \\; 4.10]",
+          explanation: "Synthetic point x_new is positioned at (2.40, 4.10).",
+        },
+        {
+          title: "Verify Collinearity and Euclidean Distance Proportion",
+          calculation: "d(\\mathbf{x}_1, \\mathbf{x}_{\\text{new}}) = \\sqrt{(2.40-2.0)^2 + (4.10-3.5)^2} = \\sqrt{0.16 + 0.36} = \\sqrt{0.52} \\approx 0.7211 \\\\ \\lambda \\times d(\\mathbf{x}_1, \\mathbf{x}_2) = 0.40 \\times 1.8028 = 0.7211 \\quad (\\text{Exact match!})",
+          explanation: "x_new lies precisely 40% of the distance from x_1 to x_2 along the line segment.",
+        },
+      ],
+      result: "Synthetic instance x_new = [2.40, 4.10] successfully generated without copying existing points.",
+    },
+    rfConnection:
+      "Pairing SMOTE with Random Forest via imblearn.pipeline.Pipeline provides structural diversity for tree construction, expanding decision boundaries while protecting cross-validation integrity.",
+    code: `from imblearn.over_sampling import SMOTE
+from imblearn.pipeline import Pipeline as ImbPipeline
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report
+from sklearn.model_selection import train_test_split
+from sklearn.datasets import make_classification
+
+X, y = make_classification(n_samples=5000, weights=[0.98, 0.02], random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, stratify=y, random_state=42)
+
+# Certified leak-free pipeline: SMOTE runs strictly on training fold
+pipe_smote = ImbPipeline([
+    ('smote', SMOTE(k_neighbors=5, random_state=42)),
+    ('classifier', RandomForestClassifier(n_estimators=200, max_depth=12, random_state=42, n_jobs=-1))
+])
+pipe_smote.fit(X_train, y_train)
+
+y_pred = pipe_smote.predict(X_test)
+print(classification_report(y_test, y_pred, target_names=['Normal', 'Minority']))`,
+    codeExplanation:
+      "ImbPipeline ensures that SMOTE synthesizes samples strictly on training folds, preserving untouched validation distributions.",
+    application:
+      "Rare genomics biomarker discovery uses SMOTE to augment scarce patient cohort samples (e.g. 30 rare disease cases vs 3,000 controls), generating continuous feature diversity for genetic signature extraction.",
+    mistakes: [
+      "Applying SMOTE before train-test splitting (causes catastrophic data leakage into test sets).",
+      "Using standard SMOTE on categorical data (use SMOTE-NC instead).",
+      "Using SMOTE when minority instances are extreme noisy outliers (causes bridging across classes).",
+    ],
+    prosCons: {
+      pros: [
+        "Avoids exact duplicate memorization associated with Random Oversampling.",
+        "Populates sparse regions of minority feature space.",
+        "Improves minority recall and decision boundary smoothness.",
+      ],
+      cons: [
+        "Can synthesize noise if minority samples overlap with majority.",
+        "Higher computational overhead than class weighting.",
+      ],
+    },
+    takeaways: [
+      "SMOTE generates synthetic samples via vector interpolation: x_new = x_i + lambda * (x_zi - x_i).",
+      "Overcomes Random Oversampling's exact duplication overfitting flaw.",
+      "Always execute SMOTE strictly inside training folds using imblearn.pipeline.Pipeline.",
+    ],
+    quiz: {
+      prompt: "How does SMOTE select the location of a new synthetic minority observation?",
+      options: [
+        "At a random point along the line segment connecting a seed minority instance to one of its k-nearest minority neighbors",
+        "At the exact arithmetic mean of the entire dataset",
+        "By duplicating an existing minority observation without changes",
+        "By randomly deleting majority observations",
+      ],
+      answerIndex: 0,
+      explanation:
+        "SMOTE computes x_new = x_i + lambda * (x_zi - x_i) where lambda is drawn uniformly from [0, 1] and x_zi is a k-nearest neighbor from the minority class. This places x_new strictly on the line segment connecting x_i and x_zi.",
+    },
+  },
+
 
   "hyperparameter-optimization": {
     slug: "hyperparameter-optimization",

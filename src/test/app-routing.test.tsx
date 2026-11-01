@@ -25,6 +25,8 @@ describe("App routing", () => {
     "/oob-estimation",
     "/feature-importance",
     "/imbalanced-data",
+    "/class-weighting",
+    "/smote",
     "/hyperparameter-optimization",
     "/advanced-techniques",
     "/mathematical-deep-dive",

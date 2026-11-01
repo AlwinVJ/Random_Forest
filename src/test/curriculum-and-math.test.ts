@@ -72,6 +72,123 @@ describe("Random Forest Mathematical Algorithms", () => {
     expect(var100Trees).toBe(20.8); // 20 + 0.8 = 20.8
     expect(varInf).toBe(20); // Asymptotic correlation floor
   });
+
+  it("calculates exact SMOTE linear vector interpolation and collinearity", () => {
+    const xSeed = [2.0, 3.5];
+    const xNeighbor = [3.0, 5.0];
+    const lambda = 0.40;
+
+    const xNew = [
+      xSeed[0] + lambda * (xNeighbor[0] - xSeed[0]),
+      xSeed[1] + lambda * (xNeighbor[1] - xSeed[1]),
+    ];
+
+    expect(xNew[0]).toBeCloseTo(2.40, 5);
+    expect(xNew[1]).toBeCloseTo(4.10, 5);
+
+    // Verify Euclidean distance proportionality
+    const dFull = Math.sqrt(Math.pow(xNeighbor[0] - xSeed[0], 2) + Math.pow(xNeighbor[1] - xSeed[1], 2));
+    const dNew = Math.sqrt(Math.pow(xNew[0] - xSeed[0], 2) + Math.pow(xNew[1] - xSeed[1], 2));
+    expect(dNew).toBeCloseTo(lambda * dFull, 5);
+  });
+
+  it("computes Balanced Class Weights inversely proportional to frequencies", () => {
+    const computeWeight = (N: number, K: number, Nc: number) => N / (K * Nc);
+
+    const N = 1000;
+    const K = 2;
+    const N0 = 950;
+    const N1 = 50;
+
+    const w0 = computeWeight(N, K, N0);
+    const w1 = computeWeight(N, K, N1);
+
+    expect(w0).toBeCloseTo(1000 / (2 * 950), 5); // ~0.5263
+    expect(w1).toBe(10.0); // Exactly 10.0
+
+    // Ensure total weighted mass is equal between classes
+    expect(N0 * w0).toBeCloseTo(500, 5);
+    expect(N1 * w1).toBeCloseTo(500, 5);
+  });
+
+  it("computes exact Matthews Correlation Coefficient (MCC) on imbalanced contingency tables", () => {
+    const computeMCC = (tp: number, tn: number, fp: number, fn: number) => {
+      const numerator = tp * tn - fp * fn;
+      const denominator = Math.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn));
+      return denominator === 0 ? 0 : numerator / denominator;
+    };
+
+    // Realistic imbalanced contingency table (N = 10,000, 1% positive)
+    const tp = 80;
+    const tn = 9800;
+    const fp = 100;
+    const fn = 20;
+
+    const mcc = computeMCC(tp, tn, fp, fn);
+    const expected = (80 * 9800 - 100 * 20) / Math.sqrt(180 * 100 * 9900 * 9820);
+    expect(mcc).toBeCloseTo(expected, 4);
+    expect(mcc).toBeGreaterThan(0.5);
+
+    // Degenerate trivial majority classifier (predict all negative)
+    const mccTrivial = computeMCC(0, 9900, 0, 100);
+    expect(mccTrivial).toBe(0); // Penalized to zero despite 99% accuracy!
+  });
+
+  it("computes Balanced Accuracy correctly", () => {
+    const sensitivity = 80 / 100; // 0.80
+    const specificity = 9800 / 9900; // ~0.9899
+    const balancedAcc = 0.5 * (sensitivity + specificity);
+
+    expect(balancedAcc).toBeCloseTo(0.89495, 4);
+
+    // Trivial classifier sensitivity = 0, specificity = 1 -> Balanced Acc = 0.5 (random guess baseline)
+    const trivialBalancedAcc = 0.5 * (0 + 1.0);
+    expect(trivialBalancedAcc).toBe(0.5);
+  });
+
+  it("calculates exact weighted misclassification loss L_weighted", () => {
+    // L_weighted = sum_{i=1}^N w_{y_i} * L(y_i, y_hat_i)
+    const samples = [
+      { y: 0, loss: 0.2 },
+      { y: 1, loss: 0.8 },
+      { y: 0, loss: 0.1 },
+    ];
+    const customWeights: Record<number, number> = { 0: 1.0, 1: 5.0 };
+
+    const weightedLoss = samples.reduce(
+      (acc, s) => acc + customWeights[s.y] * s.loss,
+      0
+    );
+
+    // 1.0 * 0.2 + 5.0 * 0.8 + 1.0 * 0.1 = 0.2 + 4.0 + 0.1 = 4.3
+    expect(weightedLoss).toBeCloseTo(4.3, 5);
+  });
+
+  it("verifies numerical transformations for Random Oversampling and Undersampling", () => {
+    // Random Oversampling: 900 Maj, 100 Min -> 900 Maj, 900 Min
+    const nMajInit = 900;
+    const nMinInit = 100;
+
+    const nMinOver = nMajInit;
+    const nTotalOver = nMajInit + nMinOver;
+    const duplicationFactor = nMinOver / nMinInit;
+
+    expect(nMinOver).toBe(900);
+    expect(nTotalOver).toBe(1800);
+    expect(duplicationFactor).toBe(9.0);
+
+    // Random Undersampling: 10,000 Maj, 200 Min -> 200 Maj, 200 Min
+    const nMajHuge = 10000;
+    const nMinSmall = 200;
+
+    const nMajUnder = nMinSmall;
+    const nTotalUnder = nMajUnder + nMinSmall;
+    const discardedMaj = nMajHuge - nMajUnder;
+
+    expect(nMajUnder).toBe(200);
+    expect(nTotalUnder).toBe(400);
+    expect(discardedMaj).toBe(9800);
+  });
 });
 
 describe("Curriculum Completeness & Integrity", () => {
@@ -89,6 +206,8 @@ describe("Curriculum Completeness & Integrity", () => {
       "oob-estimation",
       "feature-importance",
       "imbalanced-data",
+      "class-weighting",
+      "smote",
       "hyperparameter-optimization",
       "classification-project",
       "regression-project",

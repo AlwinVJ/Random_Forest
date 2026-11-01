@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { LessonTemplate } from "@/components/lab/LessonTemplate";
+import { ImbalancedLabModule } from "@/components/lab/ImbalancedLabModule";
 import { lessons } from "@/content/lessons";
 
 const lesson = lessons["imbalanced-data"]!;
@@ -13,5 +14,16 @@ export const Route = createFileRoute("/imbalanced-data")({
       { property: "og:description", content: lesson.intro },
     ],
   }),
-  component: () => <LessonTemplate lesson={lesson} />,
+  component: ImbalancedDataPage,
 });
+
+function ImbalancedDataPage() {
+  return (
+    <div>
+      <LessonTemplate lesson={lesson} />
+      <div className="mx-auto max-w-6xl px-4 pb-16 md:px-8">
+        <ImbalancedLabModule />
+      </div>
+    </div>
+  );
+}
