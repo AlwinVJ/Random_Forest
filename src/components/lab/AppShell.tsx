@@ -1,8 +1,9 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
-import { Menu, PanelLeftClose, PanelLeftOpen, Search, X, Github } from "lucide-react";
+import { Menu, PanelLeftClose, PanelLeftOpen, Search, X} from "lucide-react";
 import { navGroups, allNavItems } from "@/content/nav";
 import { cn } from "@/lib/utils";
+import { SiGithub } from "@icons-pack/react-simple-icons";
 
 function Logo({ compact }: { compact?: boolean }) {
   return (
@@ -73,7 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside
         className={cn(
           "sticky top-0 hidden h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 md:flex",
-          collapsed ? "w-16" : "w-[260px]",
+          collapsed ? "w-16" : "w-65",
         )}
       >
         <div className={cn("flex h-16 items-center border-b border-sidebar-border", collapsed ? "justify-center" : "px-4")}>
@@ -86,7 +87,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <aside className="animate-fade-up absolute inset-y-0 left-0 flex w-[280px] flex-col border-r border-sidebar-border bg-sidebar">
+          <aside className="animate-fade-up absolute inset-y-0 left-0 flex w-70 flex-col border-r border-sidebar-border bg-sidebar">
             <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
               <Logo />
               <button aria-label="Close menu" onClick={() => setMobileOpen(false)} className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary">
@@ -118,7 +119,16 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Search className="size-3.5" />
               <span className="w-40">Search lessons…</span>
             </div>
-            <span className="rounded-md border border-border p-1.5 text-muted-foreground"><Github className="size-4" /></span>
+            <a
+                href="https://github.com/AlwinVJ/Random_Forest"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="View source code on GitHub"
+                title="View source code on GitHub"
+                className="rounded-md border border-border p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              >
+                <SiGithub size={16} />
+              </a>
           </div>
         </header>
         <main className="min-w-0 flex-1">{children}</main>
