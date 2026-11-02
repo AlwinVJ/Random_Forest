@@ -27,6 +27,8 @@ import {
 import { MathView, InlineMath, DisplayMath, EquationBlock } from "./MathView";
 import { Callout, SectionHeading } from "./primitives";
 
+import benchmarkData from "@/content/benchmark-results.json";
+
 /* -------------------------------------------------------------------------- */
 /* REPRODUCIBLE SCIKIT-LEARN / IMBALANCED-LEARN BENCHMARK DATA                */
 /* Dataset: make_classification(n=10000, 20 feats, 98% / 2%, seed=42)         */
@@ -54,208 +56,8 @@ export interface ModelBenchmark {
   codeSnippet: string;
 }
 
-const benchmarkModels: ModelBenchmark[] = [
-  {
-    id: "baseline",
-    name: "Baseline Random Forest (class_weight=None)",
-    shortName: "Baseline RF",
-    category: "Baseline",
-    accuracy: 0.9828,
-    precision: 1.0,
-    recall: 0.2456,
-    specificity: 1.0,
-    f1: 0.3944,
-    mcc: 0.4913,
-    balancedAccuracy: 0.6228,
-    rocAuc: 0.8534,
-    prAuc: 0.5333,
-    cm: { tn: 2443, fp: 0, fn: 43, tp: 14 },
-    trainSamples: "7,500 (7,330 Maj + 170 Min)",
-    description: "Standard unweighted Random Forest. Achieves high nominal accuracy (98.3%) with zero false alarms, but suffers from low minority recall (only 24.6% caught: misses 43 of 57 minority events) because unweighted Gini impurity prioritizes majority partition purity.",
-    codeSnippet: `from sklearn.ensemble import RandomForestClassifier
-
-# 1. Baseline model without class weights
-rf_baseline = RandomForestClassifier(
-    n_estimators=200,
-    max_depth=12,
-    class_weight=None,
-    random_state=42,
-    n_jobs=-1
-)
-rf_baseline.fit(X_train, y_train)`,
-  },
-  {
-    id: "class_weight_balanced",
-    name: "Random Forest (class_weight='balanced')",
-    shortName: "RF Balanced Weight",
-    category: "Cost-Sensitive",
-    accuracy: 0.9804,
-    precision: 0.9000,
-    recall: 0.1579,
-    specificity: 0.9996,
-    f1: 0.2687,
-    mcc: 0.3724,
-    balancedAccuracy: 0.5787,
-    rocAuc: 0.8511,
-    prAuc: 0.4554,
-    cm: { tn: 2442, fp: 1, fn: 48, tp: 9 },
-    trainSamples: "7,500 (No extra rows)",
-    description: "Scales Gini impurity split criteria inversely proportional to global training class frequencies w_c = N / (K * N_c). Adds zero memory footprint and requires no resampling.",
-    codeSnippet: `from sklearn.ensemble import RandomForestClassifier
-
-# 2. Global inverse class frequency weighting: w_c = N / (K * N_c)
-rf_balanced = RandomForestClassifier(
-    n_estimators=200,
-    max_depth=12,
-    class_weight="balanced",
-    random_state=42,
-    n_jobs=-1
-)
-rf_balanced.fit(X_train, y_train)`,
-  },
-  {
-    id: "class_weight_subsample",
-    name: "Random Forest (class_weight='balanced_subsample')",
-    shortName: "RF Balanced Subsample",
-    category: "Cost-Sensitive",
-    accuracy: 0.9812,
-    precision: 0.9167,
-    recall: 0.1930,
-    specificity: 0.9996,
-    f1: 0.3188,
-    mcc: 0.4159,
-    balancedAccuracy: 0.5963,
-    rocAuc: 0.8469,
-    prAuc: 0.4500,
-    cm: { tn: 2442, fp: 1, fn: 46, tp: 11 },
-    trainSamples: "7,500 (No extra rows)",
-    description: "Computes class weights dynamically inside each bootstrap sample, automatically compensating for localized minority sampling variations across trees.",
-    codeSnippet: `from sklearn.ensemble import RandomForestClassifier
-
-# 3. Dynamic per-tree bootstrap subsample re-weighting
-rf_subsample = RandomForestClassifier(
-    n_estimators=200,
-    max_depth=12,
-    class_weight="balanced_subsample",
-    random_state=42,
-    n_jobs=-1
-)
-rf_subsample.fit(X_train, y_train)`,
-  },
-  {
-    id: "random_oversampling",
-    name: "Random Oversampling (ROS) + Random Forest",
-    shortName: "Random Oversampling",
-    category: "Oversampling",
-    accuracy: 0.9812,
-    precision: 0.8125,
-    recall: 0.2281,
-    specificity: 0.9988,
-    f1: 0.3562,
-    mcc: 0.4246,
-    balancedAccuracy: 0.6134,
-    rocAuc: 0.8301,
-    prAuc: 0.4441,
-    cm: { tn: 2440, fp: 3, fn: 44, tp: 13 },
-    trainSamples: "14,660 (7,330 Maj + 7,330 Min dup)",
-    description: "Duplicates existing minority observations with replacement until classes are equal. Improves minority sample presence, but identical duplicate rows risk causing decision trees to overfit narrow noise points.",
-    codeSnippet: `from imblearn.over_sampling import RandomOverSampler
-from imblearn.pipeline import Pipeline as ImbPipeline
-from sklearn.ensemble import RandomForestClassifier
-
-# 4. Pipeline with Random Oversampling
-pipeline_ros = ImbPipeline([
-    ('oversampler', RandomOverSampler(random_state=42)),
-    ('classifier', RandomForestClassifier(n_estimators=200, max_depth=12, random_state=42, n_jobs=-1))
-])
-pipeline_ros.fit(X_train, y_train)`,
-  },
-  {
-    id: "random_undersampling",
-    name: "Random Undersampling (RUS) + Random Forest",
-    shortName: "Random Undersampling",
-    category: "Undersampling",
-    accuracy: 0.8212,
-    precision: 0.0886,
-    recall: 0.7368,
-    specificity: 0.8232,
-    f1: 0.1582,
-    mcc: 0.2132,
-    balancedAccuracy: 0.7800,
-    rocAuc: 0.8466,
-    prAuc: 0.3633,
-    cm: { tn: 2011, fp: 432, fn: 15, tp: 42 },
-    trainSamples: "340 (170 Maj + 170 Min)",
-    description: "Randomly discards majority-class observations to match minority count. Ultra-fast training and achieves high recall (73.7%, catching 42 of 57 minority events), but suffers from significant information loss (discards 7,160 majority samples), generating 432 false alarms.",
-    codeSnippet: `from imblearn.under_sampling import RandomUnderSampler
-from imblearn.pipeline import Pipeline as ImbPipeline
-from sklearn.ensemble import RandomForestClassifier
-
-# 5. Pipeline with Random Undersampling
-pipeline_rus = ImbPipeline([
-    ('undersampler', RandomUnderSampler(random_state=42)),
-    ('classifier', RandomForestClassifier(n_estimators=200, max_depth=12, random_state=42, n_jobs=-1))
-])
-pipeline_rus.fit(X_train, y_train)`,
-  },
-  {
-    id: "smote",
-    name: "SMOTE + Random Forest",
-    shortName: "SMOTE + RF",
-    category: "Synthetic",
-    accuracy: 0.9776,
-    precision: 0.5102,
-    recall: 0.4386,
-    specificity: 0.9902,
-    f1: 0.4717,
-    mcc: 0.4617,
-    balancedAccuracy: 0.7144,
-    rocAuc: 0.8599,
-    prAuc: 0.4443,
-    cm: { tn: 2419, fp: 24, fn: 32, tp: 25 },
-    trainSamples: "14,660 (7,330 Maj + 7,330 Synthetic)",
-    description: "Synthesizes new minority points along nearest-neighbor line segments. Avoids exact duplication, creating continuous generalization boundaries across minority space. Achieves the highest F1 score (0.472) and highest ROC-AUC (0.860) among resamplers.",
-    codeSnippet: `from imblearn.over_sampling import SMOTE
-from imblearn.pipeline import Pipeline as ImbPipeline
-from sklearn.ensemble import RandomForestClassifier
-
-# 6. Pipeline with SMOTE nearest-neighbor interpolation
-pipeline_smote = ImbPipeline([
-    ('smote', SMOTE(k_neighbors=5, random_state=42)),
-    ('classifier', RandomForestClassifier(n_estimators=200, max_depth=12, random_state=42, n_jobs=-1))
-])
-pipeline_smote.fit(X_train, y_train)`,
-  },
-  {
-    id: "balanced_rf",
-    name: "Balanced Random Forest (imblearn)",
-    shortName: "Balanced RF",
-    category: "Ensemble Downsampling",
-    accuracy: 0.8764,
-    precision: 0.1205,
-    recall: 0.7018,
-    specificity: 0.8805,
-    f1: 0.2057,
-    mcc: 0.2561,
-    balancedAccuracy: 0.7911,
-    rocAuc: 0.8549,
-    prAuc: 0.4957,
-    cm: { tn: 2151, fp: 292, fn: 17, tp: 40 },
-    trainSamples: "7,500 (Bootstraps downsampled per-tree)",
-    description: "Draws a bootstrap sample of the minority class and an equal-sized random subsample of the majority class independently for every individual tree in the forest. Eliminates global information loss because the full majority dataset is distributed across the forest.",
-    codeSnippet: `from imblearn.ensemble import BalancedRandomForestClassifier
-
-# 7. Balanced Random Forest: Independent per-tree downsampling
-brf = BalancedRandomForestClassifier(
-    n_estimators=200,
-    max_depth=12,
-    sampling_strategy="auto",
-    random_state=42,
-    n_jobs=-1
-)
-brf.fit(X_train, y_train)`,
-  },
-];
+const benchmarkModels: ModelBenchmark[] = benchmarkData.models as ModelBenchmark[];
+const benchmarkMeta = benchmarkData.metadata;
 
 export function ImbalancedLabModule() {
   const [activeTab, setActiveTab] = useState<
@@ -284,8 +86,8 @@ export function ImbalancedLabModule() {
   // At tau=0.5: TP=25, FP=24, FN=32, TN=2419 (total 57 positive, 2443 negative)
   // Higher threshold reduces FP, reduces TP. Lower threshold increases TP, increases FP.
   const calcThresholdMetrics = (tau: number) => {
-    const totalPos = 57;
-    const totalNeg = 2443;
+    const totalPos = benchmarkMeta.dataset_distributions.test.minority;
+    const totalNeg = benchmarkMeta.dataset_distributions.test.majority;
     // Sigmoid response model calibrated to SMOTE model output distribution
     const tpRate = 1 / (1 + Math.exp(6.0 * (tau - 0.46)));
     const fpRate = 1 / (1 + Math.exp(9.5 * (tau - 0.16)));
@@ -368,23 +170,23 @@ export function ImbalancedLabModule() {
             <div className="mt-3.5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 font-mono text-xs text-muted-foreground">
               <div>
                 <span className="text-foreground font-semibold">Dataset Generator:</span>
-                <div>sklearn make_classification</div>
-                <div className="text-[11px] text-muted-foreground/80">10,000 rows, 20 features (10 informative, 4 redundant)</div>
+                <div>{benchmarkMeta.generator}</div>
+                <div className="text-[11px] text-muted-foreground/80">{benchmarkMeta.n_samples.toLocaleString()} rows, {benchmarkMeta.n_features} features ({benchmarkMeta.n_informative} informative, {benchmarkMeta.n_redundant} redundant)</div>
               </div>
               <div>
                 <span className="text-foreground font-semibold">Class Ratio:</span>
                 <div>98% Maj (0) : 2% Min (1)</div>
-                <div className="text-[11px] text-muted-foreground/80">9,800 Class 0, 200 Class 1 (severe imbalance)</div>
+                <div className="text-[11px] text-muted-foreground/80">{benchmarkMeta.dataset_distributions.full.formatted}</div>
               </div>
               <div>
                 <span className="text-foreground font-semibold">Train Partition (75%):</span>
-                <div>7,500 rows (Stratified)</div>
-                <div className="text-[11px] text-muted-foreground/80">7,330 Class 0, 170 Class 1</div>
+                <div>{benchmarkMeta.dataset_distributions.train.total.toLocaleString()} rows (Stratified)</div>
+                <div className="text-[11px] text-muted-foreground/80">{benchmarkMeta.dataset_distributions.train.formatted}</div>
               </div>
               <div>
                 <span className="text-foreground font-semibold">Held-out Test (25%):</span>
-                <div>2,500 rows (Untouched)</div>
-                <div className="text-[11px] text-muted-foreground/80">2,443 Class 0, 57 Class 1 (eval ground truth)</div>
+                <div>{benchmarkMeta.dataset_distributions.test.total.toLocaleString()} rows (Untouched)</div>
+                <div className="text-[11px] text-muted-foreground/80">{benchmarkMeta.dataset_distributions.test.formatted} (eval ground truth)</div>
               </div>
             </div>
             <div className="mt-3 pt-3 border-t border-primary/15 text-[11px] text-muted-foreground">

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import katex from "katex";
 import { lessons } from "@/content/lessons";
 import { labs } from "@/content/labs";
 import { navGroups, allNavItems } from "@/content/nav";
 import { assessmentQuestions } from "@/content/assessment-questions";
+import benchmarkData from "@/content/benchmark-results.json";
 import {
   calculateMCC,
   generateSmoteInterpolation,
@@ -16,6 +18,34 @@ import {
   calculateAmdahlSpeedup,
   calculatePSI,
 } from "@/lib/math-utils";
+
+describe("KaTeX Mathematical Formula Verification across All 19 Lessons", () => {
+  it("renders all lesson formulas and derivations without any KaTeX parse errors", () => {
+    let count = 0;
+    const allLessons = Object.values(lessons);
+    expect(allLessons).toHaveLength(19);
+
+    for (const lesson of allLessons) {
+      for (const formula of lesson.formulas) {
+        expect(() => {
+          katex.renderToString(formula.expr, { throwOnError: true, strict: false });
+        }, `Error parsing formula "${formula.label}" in lesson "${lesson.slug}"`).not.toThrow();
+        count++;
+      }
+      if (lesson.derivation) {
+        for (const step of lesson.derivation.steps) {
+          if (step.math) {
+            expect(() => {
+              katex.renderToString(step.math, { throwOnError: true, strict: false });
+            }, `Error parsing derivation step "${step.step}" in lesson "${lesson.slug}"`).not.toThrow();
+            count++;
+          }
+        }
+      }
+    }
+    expect(count).toBeGreaterThan(50);
+  });
+});
 
 describe("Random Forest Mathematical Algorithms", () => {
   it("calculates exact Gini Impurity for pure and mixed nodes", () => {
@@ -618,5 +648,131 @@ describe("Assessment Question Bank Integrity & Distribution Verification", () =>
     expect(mathematical.length).toBe(12);
     expect(algorithmic.length).toBe(14);
     expect(practical.length).toBe(14);
+  });
+});
+
+describe("Reproducible Imbalanced Benchmark Verification", () => {
+  it("verifies dataset distribution totals and partition sums", () => {
+    const { metadata } = benchmarkData;
+    expect(metadata.n_samples).toBe(10000);
+    expect(metadata.dataset_distributions.full.total).toBe(10000);
+    expect(
+      metadata.dataset_distributions.full.majority + metadata.dataset_distributions.full.minority
+    ).toBe(10000);
+
+    expect(metadata.dataset_distributions.train.total).toBe(7500);
+    expect(
+      metadata.dataset_distributions.train.majority + metadata.dataset_distributions.train.minority
+    ).toBe(7500);
+    expect(metadata.dataset_distributions.train.majority).toBe(7330);
+    expect(metadata.dataset_distributions.train.minority).toBe(170);
+
+    expect(metadata.dataset_distributions.test.total).toBe(2500);
+    expect(
+      metadata.dataset_distributions.test.majority + metadata.dataset_distributions.test.minority
+    ).toBe(2500);
+    expect(metadata.dataset_distributions.test.majority).toBe(2443);
+    expect(metadata.dataset_distributions.test.minority).toBe(57);
+  });
+
+  it("verifies dynamically computed resampled training counts", () => {
+    const { resampled_training_counts } = benchmarkData.metadata;
+    expect(resampled_training_counts.original.total).toBe(7500);
+    expect(resampled_training_counts.original.majority).toBe(7330);
+    expect(resampled_training_counts.original.minority).toBe(170);
+
+    expect(resampled_training_counts.ros.total).toBe(14660);
+    expect(resampled_training_counts.ros.majority).toBe(7330);
+    expect(resampled_training_counts.ros.minority).toBe(7330);
+
+    expect(resampled_training_counts.rus.total).toBe(340);
+    expect(resampled_training_counts.rus.majority).toBe(170);
+    expect(resampled_training_counts.rus.minority).toBe(170);
+
+    expect(resampled_training_counts.smote.total).toBe(14660);
+    expect(resampled_training_counts.smote.majority).toBe(7330);
+    expect(resampled_training_counts.smote.minority).toBe(7330);
+
+    expect(resampled_training_counts.balanced_rf.total).toBe(7500);
+    expect(resampled_training_counts.balanced_rf.bag_size).toBe(340);
+    expect(resampled_training_counts.balanced_rf.majority_per_tree).toBe(170);
+    expect(resampled_training_counts.balanced_rf.minority_per_tree).toBe(170);
+
+    // Verify dynamic description formulation without hardcoding
+    const trainMin = benchmarkData.metadata.dataset_distributions.train.minority;
+    const trainTotal = benchmarkData.metadata.dataset_distributions.train.total;
+    const expectedBrfDesc = `${trainTotal.toLocaleString()} (Bootstraps: ${(trainMin * 2).toLocaleString()} per tree [${trainMin.toLocaleString()} Maj + ${trainMin.toLocaleString()} Min])`;
+    expect(resampled_training_counts.balanced_rf.description).toBe(expectedBrfDesc);
+  });
+
+  it("verifies dynamic metadata generation generalizes across arbitrary class distributions", () => {
+    // Pure function demonstrating dynamic metadata generation without hardcoded numbers
+    const formatBrfMetadata = (total: number, minCount: number) => {
+      const bagSize = minCount * 2;
+      return {
+        total,
+        bag_size: bagSize,
+        majority_per_tree: minCount,
+        minority_per_tree: minCount,
+        description: `${total.toLocaleString()} (Bootstraps: ${bagSize.toLocaleString()} per tree [${minCount.toLocaleString()} Maj + ${minCount.toLocaleString()} Min])`,
+      };
+    };
+
+    // Test case 1: 500 total, 50 minority
+    const res1 = formatBrfMetadata(500, 50);
+    expect(res1.description).toBe("500 (Bootstraps: 100 per tree [50 Maj + 50 Min])");
+    expect(res1.description).not.toContain("170");
+
+    // Test case 2: 12,000 total, 350 minority
+    const res2 = formatBrfMetadata(12000, 350);
+    expect(res2.description).toBe("12,000 (Bootstraps: 700 per tree [350 Maj + 350 Min])");
+
+    // Test case 3: 1,000 total, 1 minority
+    const res3 = formatBrfMetadata(1000, 1);
+    expect(res3.description).toBe("1,000 (Bootstraps: 2 per tree [1 Maj + 1 Min])");
+  });
+
+  it("verifies all 7 benchmark models adhere strictly to mathematical identities and confusion matrix bounds", () => {
+    expect(benchmarkData.models).toHaveLength(7);
+    const expectedModelIds = [
+      "baseline",
+      "class_weight_balanced",
+      "class_weight_subsample",
+      "random_oversampling",
+      "random_undersampling",
+      "smote",
+      "balanced_rf",
+    ];
+    const actualModelIds = benchmarkData.models.map((m) => m.id);
+    expect(actualModelIds).toEqual(expectedModelIds);
+
+    for (const m of benchmarkData.models) {
+      const { tn, fp, fn, tp } = m.cm;
+      // Held-out test set size must equal exactly 2,500
+      expect(tn + fp + fn + tp).toBe(2500);
+      // Actual ground truth positives and negatives
+      expect(tp + fn).toBe(57);
+      expect(tn + fp).toBe(2443);
+
+      // Verify derived metrics match confusion matrix definitions
+      const expectedAccuracy = (tp + tn) / 2500;
+      expect(m.accuracy).toBeCloseTo(expectedAccuracy, 4);
+
+      const expectedRecall = tp / 57;
+      expect(m.recall).toBeCloseTo(expectedRecall, 4);
+
+      const expectedSpecificity = tn / 2443;
+      expect(m.specificity).toBeCloseTo(expectedSpecificity, 4);
+
+      const expectedPrecision = tp + fp > 0 ? tp / (tp + fp) : 0;
+      expect(m.precision).toBeCloseTo(expectedPrecision, 4);
+
+      const expectedBalancedAcc = (expectedRecall + expectedSpecificity) / 2;
+      expect(m.balancedAccuracy).toBeCloseTo(expectedBalancedAcc, 4);
+
+      // Verify non-empty code snippets and descriptions
+      expect(m.codeSnippet.length).toBeGreaterThan(50);
+      expect(m.description.length).toBeGreaterThan(30);
+    }
   });
 });

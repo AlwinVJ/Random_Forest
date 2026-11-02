@@ -1,0 +1,245 @@
+{
+  "metadata": {
+    "generator": "sklearn.datasets.make_classification",
+    "random_state": 42,
+    "n_samples": 10000,
+    "n_features": 20,
+    "n_informative": 10,
+    "n_redundant": 4,
+    "flip_y": 0.005,
+    "weights_parameter": [
+      0.98,
+      0.02
+    ],
+    "environment": {
+      "sklearn_version": "1.6.1",
+      "imblearn_version": "0.13.0"
+    },
+    "dataset_distributions": {
+      "full": {
+        "total": 10000,
+        "majority": 9773,
+        "minority": 227,
+        "minority_prevalence": 0.0227,
+        "formatted": "9,773 Majority (0) vs 227 Minority (1) [2.27%]"
+      },
+      "train": {
+        "total": 7500,
+        "majority": 7330,
+        "minority": 170,
+        "formatted": "7,330 Majority (0) vs 170 Minority (1)"
+      },
+      "test": {
+        "total": 2500,
+        "majority": 2443,
+        "minority": 57,
+        "formatted": "2,443 Majority (0) vs 57 Minority (1)"
+      }
+    },
+    "resampled_training_counts": {
+      "original": {
+        "total": 7500,
+        "majority": 7330,
+        "minority": 170,
+        "majority_label": 0,
+        "minority_label": 1,
+        "description": "7,500 (7,330 Maj + 170 Min)"
+      },
+      "ros": {
+        "total": 14660,
+        "majority": 7330,
+        "minority": 7330,
+        "description": "14,660 (7,330 Maj + 7,330 Min duplicated)"
+      },
+      "rus": {
+        "total": 340,
+        "majority": 170,
+        "minority": 170,
+        "description": "340 (170 Maj + 170 Min)"
+      },
+      "smote": {
+        "total": 14660,
+        "majority": 7330,
+        "minority": 7330,
+        "description": "14,660 (7,330 Maj + 7,330 Synthetic)"
+      },
+      "balanced_rf": {
+        "total": 7500,
+        "bag_size": 340,
+        "majority_per_tree": 170,
+        "minority_per_tree": 170,
+        "description": "7,500 (Bootstraps: 340 per tree [170 Maj + 170 Min])"
+      }
+    }
+  },
+  "models": [
+    {
+      "id": "baseline",
+      "name": "Baseline Random Forest (class_weight=None)",
+      "shortName": "Baseline RF",
+      "category": "Baseline",
+      "accuracy": 0.9828,
+      "precision": 1.0,
+      "recall": 0.2456,
+      "specificity": 1.0,
+      "f1": 0.3944,
+      "mcc": 0.4913,
+      "balancedAccuracy": 0.6228,
+      "rocAuc": 0.8534,
+      "prAuc": 0.5333,
+      "cm": {
+        "tn": 2443,
+        "fp": 0,
+        "fn": 43,
+        "tp": 14
+      },
+      "trainSamples": "7,500 (7,330 Maj + 170 Min)",
+      "description": "Standard unweighted Random Forest. Achieves high nominal accuracy (98.3%) with zero false alarms, but suffers from low minority recall (only 24.6% caught: misses 43 of 57 minority events) because unweighted Gini impurity prioritizes majority partition purity.",
+      "codeSnippet": "from sklearn.ensemble import RandomForestClassifier\n\n# 1. Baseline model without class weights\nrf_baseline = RandomForestClassifier(\n    n_estimators=200,\n    max_depth=12,\n    class_weight=None,\n    random_state=42,\n    n_jobs=-1\n)\nrf_baseline.fit(X_train, y_train)"
+    },
+    {
+      "id": "class_weight_balanced",
+      "name": "Random Forest (class_weight='balanced')",
+      "shortName": "RF Balanced Weight",
+      "category": "Cost-Sensitive",
+      "accuracy": 0.9804,
+      "precision": 0.9,
+      "recall": 0.1579,
+      "specificity": 0.9996,
+      "f1": 0.2687,
+      "mcc": 0.3724,
+      "balancedAccuracy": 0.5787,
+      "rocAuc": 0.8511,
+      "prAuc": 0.4554,
+      "cm": {
+        "tn": 2442,
+        "fp": 1,
+        "fn": 48,
+        "tp": 9
+      },
+      "trainSamples": "7,500 (7,330 Maj + 170 Min)",
+      "description": "Scales Gini impurity split criteria inversely proportional to global training class frequencies w_c = N / (K * N_c). Adds zero memory footprint and requires no resampling.",
+      "codeSnippet": "from sklearn.ensemble import RandomForestClassifier\n\n# 2. Global inverse class frequency weighting: w_c = N / (K * N_c)\nrf_balanced = RandomForestClassifier(\n    n_estimators=200,\n    max_depth=12,\n    class_weight=\"balanced\",\n    random_state=42,\n    n_jobs=-1\n)\nrf_balanced.fit(X_train, y_train)"
+    },
+    {
+      "id": "class_weight_subsample",
+      "name": "Random Forest (class_weight='balanced_subsample')",
+      "shortName": "RF Balanced Subsample",
+      "category": "Cost-Sensitive",
+      "accuracy": 0.9812,
+      "precision": 0.9167,
+      "recall": 0.193,
+      "specificity": 0.9996,
+      "f1": 0.3188,
+      "mcc": 0.4159,
+      "balancedAccuracy": 0.5963,
+      "rocAuc": 0.8469,
+      "prAuc": 0.45,
+      "cm": {
+        "tn": 2442,
+        "fp": 1,
+        "fn": 46,
+        "tp": 11
+      },
+      "trainSamples": "7,500 (7,330 Maj + 170 Min)",
+      "description": "Computes class weights dynamically inside each bootstrap sample, automatically compensating for localized minority sampling variations across trees.",
+      "codeSnippet": "from sklearn.ensemble import RandomForestClassifier\n\n# 3. Dynamic per-tree bootstrap subsample re-weighting\nrf_subsample = RandomForestClassifier(\n    n_estimators=200,\n    max_depth=12,\n    class_weight=\"balanced_subsample\",\n    random_state=42,\n    n_jobs=-1\n)\nrf_subsample.fit(X_train, y_train)"
+    },
+    {
+      "id": "random_oversampling",
+      "name": "Random Oversampling (ROS) + Random Forest",
+      "shortName": "Random Oversampling",
+      "category": "Oversampling",
+      "accuracy": 0.9812,
+      "precision": 0.8125,
+      "recall": 0.2281,
+      "specificity": 0.9988,
+      "f1": 0.3562,
+      "mcc": 0.4246,
+      "balancedAccuracy": 0.6134,
+      "rocAuc": 0.8301,
+      "prAuc": 0.4441,
+      "cm": {
+        "tn": 2440,
+        "fp": 3,
+        "fn": 44,
+        "tp": 13
+      },
+      "trainSamples": "14,660 (7,330 Maj + 7,330 Min duplicated)",
+      "description": "Duplicates existing minority observations with replacement until classes are equal. Improves minority sample presence, but identical duplicate rows risk causing decision trees to overfit narrow noise points.",
+      "codeSnippet": "from imblearn.over_sampling import RandomOverSampler\nfrom imblearn.pipeline import Pipeline as ImbPipeline\nfrom sklearn.ensemble import RandomForestClassifier\n\n# 4. Pipeline with Random Oversampling\npipeline_ros = ImbPipeline([\n    ('oversampler', RandomOverSampler(random_state=42)),\n    ('classifier', RandomForestClassifier(n_estimators=200, max_depth=12, random_state=42, n_jobs=-1))\n])\npipeline_ros.fit(X_train, y_train)"
+    },
+    {
+      "id": "random_undersampling",
+      "name": "Random Undersampling (RUS) + Random Forest",
+      "shortName": "Random Undersampling",
+      "category": "Undersampling",
+      "accuracy": 0.8212,
+      "precision": 0.0886,
+      "recall": 0.7368,
+      "specificity": 0.8232,
+      "f1": 0.1582,
+      "mcc": 0.2132,
+      "balancedAccuracy": 0.78,
+      "rocAuc": 0.8466,
+      "prAuc": 0.3633,
+      "cm": {
+        "tn": 2011,
+        "fp": 432,
+        "fn": 15,
+        "tp": 42
+      },
+      "trainSamples": "340 (170 Maj + 170 Min)",
+      "description": "Randomly discards majority-class observations to match minority count. Ultra-fast training and achieves high recall (73.7%, catching 42 of 57 minority events), but suffers from significant information loss (discards 7,160 majority samples), generating 432 false alarms.",
+      "codeSnippet": "from imblearn.under_sampling import RandomUnderSampler\nfrom imblearn.pipeline import Pipeline as ImbPipeline\nfrom sklearn.ensemble import RandomForestClassifier\n\n# 5. Pipeline with Random Undersampling\npipeline_rus = ImbPipeline([\n    ('undersampler', RandomUnderSampler(random_state=42)),\n    ('classifier', RandomForestClassifier(n_estimators=200, max_depth=12, random_state=42, n_jobs=-1))\n])\npipeline_rus.fit(X_train, y_train)"
+    },
+    {
+      "id": "smote",
+      "name": "SMOTE + Random Forest",
+      "shortName": "SMOTE + RF",
+      "category": "Synthetic",
+      "accuracy": 0.9776,
+      "precision": 0.5102,
+      "recall": 0.4386,
+      "specificity": 0.9902,
+      "f1": 0.4717,
+      "mcc": 0.4617,
+      "balancedAccuracy": 0.7144,
+      "rocAuc": 0.8599,
+      "prAuc": 0.4443,
+      "cm": {
+        "tn": 2419,
+        "fp": 24,
+        "fn": 32,
+        "tp": 25
+      },
+      "trainSamples": "14,660 (7,330 Maj + 7,330 Synthetic)",
+      "description": "Synthesizes new minority points along nearest-neighbor line segments. Avoids exact duplication, creating continuous generalization boundaries across minority space. Achieves the highest F1 score (0.472) and highest ROC-AUC (0.860) among resamplers.",
+      "codeSnippet": "from imblearn.over_sampling import SMOTE\nfrom imblearn.pipeline import Pipeline as ImbPipeline\nfrom sklearn.ensemble import RandomForestClassifier\n\n# 6. Pipeline with SMOTE nearest-neighbor interpolation\npipeline_smote = ImbPipeline([\n    ('smote', SMOTE(k_neighbors=5, random_state=42)),\n    ('classifier', RandomForestClassifier(n_estimators=200, max_depth=12, random_state=42, n_jobs=-1))\n])\npipeline_smote.fit(X_train, y_train)"
+    },
+    {
+      "id": "balanced_rf",
+      "name": "Balanced Random Forest (imblearn)",
+      "shortName": "Balanced RF",
+      "category": "Ensemble Downsampling",
+      "accuracy": 0.8764,
+      "precision": 0.1205,
+      "recall": 0.7018,
+      "specificity": 0.8805,
+      "f1": 0.2057,
+      "mcc": 0.2561,
+      "balancedAccuracy": 0.7911,
+      "rocAuc": 0.8549,
+      "prAuc": 0.4957,
+      "cm": {
+        "tn": 2151,
+        "fp": 292,
+        "fn": 17,
+        "tp": 40
+      },
+      "trainSamples": "7,500 (Bootstraps: 340 per tree [170 Maj + 170 Min])",
+      "description": "Draws a bootstrap sample of the minority class and an equal-sized random subsample of the majority class independently for every individual tree in the forest. Eliminates global information loss because the full majority dataset is distributed across the forest.",
+      "codeSnippet": "from imblearn.ensemble import BalancedRandomForestClassifier\n\n# 7. Balanced Random Forest: Independent per-tree downsampling\nbrf = BalancedRandomForestClassifier(\n    n_estimators=200,\n    max_depth=12,\n    sampling_strategy=\"auto\",\n    random_state=42,\n    n_jobs=-1\n)\nbrf.fit(X_train, y_train)"
+    }
+  ]
+}

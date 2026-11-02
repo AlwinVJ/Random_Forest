@@ -1,13 +1,76 @@
 {
-  "dataset": {
+  "metadata": {
     "generator": "sklearn.datasets.make_classification",
+    "random_state": 42,
     "n_samples": 10000,
     "n_features": 20,
     "n_informative": 10,
     "n_redundant": 4,
-    "class_distribution": "98% Class 0 (9,800), 2% Class 1 (200)",
-    "split": "75% Stratified Train (7,500: 7,350 Maj, 150 Min), 25% Test (2,500: 2,450 Maj, 50 Min)",
-    "random_state": 42
+    "flip_y": 0.005,
+    "weights_parameter": [
+      0.98,
+      0.02
+    ],
+    "environment": {
+      "sklearn_version": "1.6.1",
+      "imblearn_version": "0.13.0"
+    },
+    "dataset_distributions": {
+      "full": {
+        "total": 10000,
+        "majority": 9773,
+        "minority": 227,
+        "minority_prevalence": 0.0227,
+        "formatted": "9,773 Majority (0) vs 227 Minority (1) [2.27%]"
+      },
+      "train": {
+        "total": 7500,
+        "majority": 7330,
+        "minority": 170,
+        "formatted": "7,330 Majority (0) vs 170 Minority (1)"
+      },
+      "test": {
+        "total": 2500,
+        "majority": 2443,
+        "minority": 57,
+        "formatted": "2,443 Majority (0) vs 57 Minority (1)"
+      }
+    },
+    "resampled_training_counts": {
+      "original": {
+        "total": 7500,
+        "majority": 7330,
+        "minority": 170,
+        "majority_label": 0,
+        "minority_label": 1,
+        "description": "7,500 (7,330 Maj + 170 Min)"
+      },
+      "ros": {
+        "total": 14660,
+        "majority": 7330,
+        "minority": 7330,
+        "description": "14,660 (7,330 Maj + 7,330 Min duplicated)"
+      },
+      "rus": {
+        "total": 340,
+        "majority": 170,
+        "minority": 170,
+        "description": "340 (170 Maj + 170 Min)"
+      },
+      "smote": {
+        "total": 14660,
+        "majority": 7330,
+        "minority": 7330,
+        "description": "14,660 (7,330 Maj + 7,330 Synthetic)"
+      },
+      "balanced_rf": {
+        "total": 7500,
+        "bag_size": 340,
+        "majority_per_tree": 170,
+        "minority_per_tree": 170,
+        "description": "7,500 (Bootstraps: 340 per tree [170 Maj + 170 Min])"
+      }
+    }
   },
   "models": [
     {
@@ -30,8 +93,9 @@
         "fn": 43,
         "tp": 14
       },
-      "trainSamples": "7,500 (7,350 Maj + 150 Min)",
-      "description": "Standard unweighted Random Forest. Achieves high nominal accuracy but low recall on rare positive events as minority splits minimize overall Gini impurity."
+      "trainSamples": "7,500 (7,330 Maj + 170 Min)",
+      "description": "Standard unweighted Random Forest. Achieves high nominal accuracy (98.3%) with zero false alarms, but suffers from low minority recall (only 24.6% caught: misses 43 of 57 minority events) because unweighted Gini impurity prioritizes majority partition purity.",
+      "codeSnippet": "from sklearn.ensemble import RandomForestClassifier\n\n# 1. Baseline model without class weights\nrf_baseline = RandomForestClassifier(\n    n_estimators=200,\n    max_depth=12,\n    class_weight=None,\n    random_state=42,\n    n_jobs=-1\n)\nrf_baseline.fit(X_train, y_train)"
     },
     {
       "id": "class_weight_balanced",
@@ -53,8 +117,9 @@
         "fn": 48,
         "tp": 9
       },
-      "trainSamples": "7,500 (No extra rows)",
-      "description": "Scales Gini impurity split criteria inversely proportional to global class frequencies w_c = N / (K * N_c), boosting minority sample influence during node splits."
+      "trainSamples": "7,500 (7,330 Maj + 170 Min)",
+      "description": "Scales Gini impurity split criteria inversely proportional to global training class frequencies w_c = N / (K * N_c). Adds zero memory footprint and requires no resampling.",
+      "codeSnippet": "from sklearn.ensemble import RandomForestClassifier\n\n# 2. Global inverse class frequency weighting: w_c = N / (K * N_c)\nrf_balanced = RandomForestClassifier(\n    n_estimators=200,\n    max_depth=12,\n    class_weight=\"balanced\",\n    random_state=42,\n    n_jobs=-1\n)\nrf_balanced.fit(X_train, y_train)"
     },
     {
       "id": "class_weight_subsample",
@@ -76,8 +141,9 @@
         "fn": 46,
         "tp": 11
       },
-      "trainSamples": "7,500 (No extra rows)",
-      "description": "Computes class weights dynamically inside each bootstrap sample, automatically compensating for localized minority sampling variations across trees."
+      "trainSamples": "7,500 (7,330 Maj + 170 Min)",
+      "description": "Computes class weights dynamically inside each bootstrap sample, automatically compensating for localized minority sampling variations across trees.",
+      "codeSnippet": "from sklearn.ensemble import RandomForestClassifier\n\n# 3. Dynamic per-tree bootstrap subsample re-weighting\nrf_subsample = RandomForestClassifier(\n    n_estimators=200,\n    max_depth=12,\n    class_weight=\"balanced_subsample\",\n    random_state=42,\n    n_jobs=-1\n)\nrf_subsample.fit(X_train, y_train)"
     },
     {
       "id": "random_oversampling",
@@ -99,8 +165,9 @@
         "fn": 44,
         "tp": 13
       },
-      "trainSamples": "14,700 (7,350 Maj + 7,350 Min dup)",
-      "description": "Duplicates minority training samples with replacement to reach parity. Increases minority sensitivity, but identical replicates risk narrow leaf overfitting."
+      "trainSamples": "14,660 (7,330 Maj + 7,330 Min duplicated)",
+      "description": "Duplicates existing minority observations with replacement until classes are equal. Improves minority sample presence, but identical duplicate rows risk causing decision trees to overfit narrow noise points.",
+      "codeSnippet": "from imblearn.over_sampling import RandomOverSampler\nfrom imblearn.pipeline import Pipeline as ImbPipeline\nfrom sklearn.ensemble import RandomForestClassifier\n\n# 4. Pipeline with Random Oversampling\npipeline_ros = ImbPipeline([\n    ('oversampler', RandomOverSampler(random_state=42)),\n    ('classifier', RandomForestClassifier(n_estimators=200, max_depth=12, random_state=42, n_jobs=-1))\n])\npipeline_ros.fit(X_train, y_train)"
     },
     {
       "id": "random_undersampling",
@@ -122,8 +189,9 @@
         "fn": 15,
         "tp": 42
       },
-      "trainSamples": "300 (150 Maj + 150 Min)",
-      "description": "Randomly discards majority class instances to match minority count. Trains extremely fast but incurs massive information loss by discarding majority observations."
+      "trainSamples": "340 (170 Maj + 170 Min)",
+      "description": "Randomly discards majority-class observations to match minority count. Ultra-fast training and achieves high recall (73.7%, catching 42 of 57 minority events), but suffers from significant information loss (discards 7,160 majority samples), generating 432 false alarms.",
+      "codeSnippet": "from imblearn.under_sampling import RandomUnderSampler\nfrom imblearn.pipeline import Pipeline as ImbPipeline\nfrom sklearn.ensemble import RandomForestClassifier\n\n# 5. Pipeline with Random Undersampling\npipeline_rus = ImbPipeline([\n    ('undersampler', RandomUnderSampler(random_state=42)),\n    ('classifier', RandomForestClassifier(n_estimators=200, max_depth=12, random_state=42, n_jobs=-1))\n])\npipeline_rus.fit(X_train, y_train)"
     },
     {
       "id": "smote",
@@ -145,8 +213,9 @@
         "fn": 32,
         "tp": 25
       },
-      "trainSamples": "14,700 (7,350 Maj + 7,350 Synthetic)",
-      "description": "Generates synthetic minority examples via linear interpolation between k-nearest neighbors in feature space, constructing continuous minority decision regions."
+      "trainSamples": "14,660 (7,330 Maj + 7,330 Synthetic)",
+      "description": "Synthesizes new minority points along nearest-neighbor line segments. Avoids exact duplication, creating continuous generalization boundaries across minority space. Achieves the highest F1 score (0.472) and highest ROC-AUC (0.860) among resamplers.",
+      "codeSnippet": "from imblearn.over_sampling import SMOTE\nfrom imblearn.pipeline import Pipeline as ImbPipeline\nfrom sklearn.ensemble import RandomForestClassifier\n\n# 6. Pipeline with SMOTE nearest-neighbor interpolation\npipeline_smote = ImbPipeline([\n    ('smote', SMOTE(k_neighbors=5, random_state=42)),\n    ('classifier', RandomForestClassifier(n_estimators=200, max_depth=12, random_state=42, n_jobs=-1))\n])\npipeline_smote.fit(X_train, y_train)"
     },
     {
       "id": "balanced_rf",
@@ -168,8 +237,9 @@
         "fn": 17,
         "tp": 40
       },
-      "trainSamples": "7,500 (Bootstraps downsampled per-tree)",
-      "description": "Draws a bootstrap sample of the minority class and an equal-sized random subsample of the majority class independently for every individual tree in the forest."
+      "trainSamples": "7,500 (Bootstraps: 340 per tree [170 Maj + 170 Min])",
+      "description": "Draws a bootstrap sample of the minority class and an equal-sized random subsample of the majority class independently for every individual tree in the forest. Eliminates global information loss because the full majority dataset is distributed across the forest.",
+      "codeSnippet": "from imblearn.ensemble import BalancedRandomForestClassifier\n\n# 7. Balanced Random Forest: Independent per-tree downsampling\nbrf = BalancedRandomForestClassifier(\n    n_estimators=200,\n    max_depth=12,\n    sampling_strategy=\"auto\",\n    random_state=42,\n    n_jobs=-1\n)\nbrf.fit(X_train, y_train)"
     }
   ]
 }
